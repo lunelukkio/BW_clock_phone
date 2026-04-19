@@ -1,13 +1,12 @@
 package com.example.bw_clock
 
 import android.os.Bundle
-import android.view.KeyEvent
 import android.view.WindowManager
 
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.graphics.graphicsLayer
@@ -18,13 +17,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -56,7 +48,6 @@ class MainActivity : ComponentActivity() {
                 .collectAsState(initial = ClockSettings())
             var showSettings by remember { mutableStateOf(false) }
             val coroutineScope = rememberCoroutineScope()
-            val focusRequester = remember { FocusRequester() }
 
             val bgColor = if (settings.isDarkBackground) ClockBlack else ClockWhite
 
@@ -73,56 +64,26 @@ class MainActivity : ComponentActivity() {
                             .graphicsLayer {
                                 rotationZ = settings.rotation.toFloat()
                             }
-                            .focusRequester(focusRequester)
-                            .focusable()
-                            .onKeyEvent { event ->
-                                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                                when (event.key) {
-                                    Key.Enter, Key.DirectionCenter, Key.Menu -> {
-                                        if (!showSettings) {
-                                            showSettings = true
-                                            true
-                                        } else false
-                                    }
-                                    Key.Back -> {
-                                        if (showSettings) {
-                                            showSettings = false
-                                            true
-                                        } else false
-                                    }
-                                    else -> false
-                                }
+                            .clickable {
+                                showSettings = !showSettings
                             }
                     ) {
                         ClockScreen(settings = settings)
+                    }
 
-                        if (showSettings) {
-                            SettingsScreen(
-                                settings = settings,
-                                repository = settingsRepository,
-                                coroutineScope = coroutineScope,
-                                onDismiss = {
-                                    showSettings = false
-                                },
-                                rotation = settings.rotation
-                            )
-                        }
+                    if (showSettings) {
+                        SettingsScreen(
+                            settings = settings,
+                            repository = settingsRepository,
+                            coroutineScope = coroutineScope,
+                            onDismiss = {
+                                showSettings = false
+                            },
+                            rotation = settings.rotation
+                        )
                     }
                 }
             }
-
-            androidx.compose.runtime.LaunchedEffect(showSettings) {
-                if (!showSettings) {
-                    focusRequester.requestFocus()
-                }
-            }
         }
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_MENU) {
-            return true
-        }
-        return super.onKeyDown(keyCode, event)
     }
 }

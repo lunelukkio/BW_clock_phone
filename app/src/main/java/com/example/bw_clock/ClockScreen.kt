@@ -78,8 +78,10 @@ fun ClockScreen(settings: ClockSettings) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val shortSide = min(size.width, size.height)
             val radius = (shortSide / 2f) * clockSizeRatio * 0.9f
-            val centerX = size.width / 2f + burnInOffsetX
-            val centerY = size.height / 2f + burnInOffsetY
+            val clockPixelOffsetX = size.width * settings.clockOffsetX / 100f
+            val clockPixelOffsetY = size.height * settings.clockOffsetY / 100f
+            val centerX = size.width / 2f + burnInOffsetX + clockPixelOffsetX
+            val centerY = size.height / 2f + burnInOffsetY + clockPixelOffsetY
             val fg = clockColors.foreground
 
             // Frame (outer circle)
@@ -220,15 +222,34 @@ private fun DrawScope.drawDate(
     val lineHeight = textPaint.fontMetrics.descent - textPaint.fontMetrics.ascent
     val textCenterOffset = -(textPaint.fontMetrics.ascent + textPaint.fontMetrics.descent) / 2f
 
-    val marginWidth = (size.width - shortSide) / 2f
-    val x: Float
-    val y: Float = size.height / 2f + burnInOffsetY
+    val datePixelOffsetX = size.width * settings.dateOffsetX / 100f
+    val datePixelOffsetY = size.height * settings.dateOffsetY / 100f
+    var baseX: Float
+    var baseY: Float
+    val isPortrait = size.height > size.width && (settings.rotation == 0 || settings.rotation == 180)
 
-    if (settings.datePosition == DatePosition.LEFT) {
-        x = marginWidth / 2f + burnInOffsetX
+    if (isPortrait) {
+        val marginHeight = (size.height - shortSide) / 2f
+        baseX = size.width / 2f + burnInOffsetX
+        if (settings.datePosition == DatePosition.LEFT) {
+            baseY = marginHeight / 2f + burnInOffsetY
+        } else {
+            baseY = size.height - marginHeight / 2f + burnInOffsetY
+        }
     } else {
-        x = size.width - marginWidth / 2f + burnInOffsetX
+        val marginWidth = (size.width - shortSide) / 2f
+        baseY = size.height / 2f + burnInOffsetY
+        if (settings.datePosition == DatePosition.LEFT) {
+            baseX = if (marginWidth > baseFontSize) marginWidth / 2f + burnInOffsetX
+                else baseFontSize * 0.8f + burnInOffsetX
+        } else {
+            baseX = if (marginWidth > baseFontSize) size.width - marginWidth / 2f + burnInOffsetX
+                else size.width - baseFontSize * 0.8f + burnInOffsetX
+        }
     }
+
+    val x = baseX + datePixelOffsetX
+    val y = baseY + datePixelOffsetY
 
     drawContext.canvas.nativeCanvas.drawText(
         dateLine, x, y - lineHeight * 0.5f + textCenterOffset, textPaint

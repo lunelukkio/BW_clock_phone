@@ -4,7 +4,7 @@
     "type": "APK",
     "kind": "Directory"
   },
-  "applicationId": "com.example.bw_clock",
+  "applicationId": "com.example.bw_clock_phone",
   "variantName": "release",
   "elements": [
     {

@@ -2,7 +2,7 @@ package com.example.bw_clock
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.focusable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -21,18 +22,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.Text
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -44,7 +36,6 @@ data class SettingsItem(
     val onSelect: () -> Unit = onRight
 )
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     settings: ClockSettings,
@@ -119,6 +110,18 @@ fun SettingsScreen(
                 onRight = { coroutineScope.launch { repository.updateClockSizePercent(settings.clockSizePercent + 10) } }
             ),
             SettingsItem(
+                label = "時計 横位置",
+                valueText = "${settings.clockOffsetX}%",
+                onLeft = { coroutineScope.launch { repository.updateClockOffsetX(settings.clockOffsetX - 5) } },
+                onRight = { coroutineScope.launch { repository.updateClockOffsetX(settings.clockOffsetX + 5) } }
+            ),
+            SettingsItem(
+                label = "時計 縦位置",
+                valueText = "${settings.clockOffsetY}%",
+                onLeft = { coroutineScope.launch { repository.updateClockOffsetY(settings.clockOffsetY - 5) } },
+                onRight = { coroutineScope.launch { repository.updateClockOffsetY(settings.clockOffsetY + 5) } }
+            ),
+            SettingsItem(
                 label = "日付",
                 valueText = if (settings.showDate) "ON" else "OFF",
                 onLeft = { coroutineScope.launch { repository.updateShowDate(!settings.showDate) } },
@@ -145,6 +148,18 @@ fun SettingsScreen(
                 onRight = { coroutineScope.launch { repository.updateDateSizePercent(settings.dateSizePercent + 10) } }
             ),
             SettingsItem(
+                label = "日付 横位置",
+                valueText = "${settings.dateOffsetX}%",
+                onLeft = { coroutineScope.launch { repository.updateDateOffsetX(settings.dateOffsetX - 5) } },
+                onRight = { coroutineScope.launch { repository.updateDateOffsetX(settings.dateOffsetX + 5) } }
+            ),
+            SettingsItem(
+                label = "日付 縦位置",
+                valueText = "${settings.dateOffsetY}%",
+                onLeft = { coroutineScope.launch { repository.updateDateOffsetY(settings.dateOffsetY - 5) } },
+                onRight = { coroutineScope.launch { repository.updateDateOffsetY(settings.dateOffsetY + 5) } }
+            ),
+            SettingsItem(
                 label = "焼付防止",
                 valueText = if (settings.burnInPrevention) "ON" else "OFF",
                 onLeft = { coroutineScope.launch { repository.updateBurnInPrevention(!settings.burnInPrevention) } },
@@ -166,52 +181,21 @@ fun SettingsScreen(
     }
 
     var selectedIndex by remember { mutableIntStateOf(0) }
-    val focusRequester = remember { FocusRequester() }
     val scrollState = rememberScrollState()
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.7f))
-            .focusRequester(focusRequester)
-            .focusable()
-            .onKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                when (event.key) {
-                    Key.DirectionUp -> {
-                        selectedIndex = (selectedIndex - 1 + items.size) % items.size
-                        true
-                    }
-                    Key.DirectionDown -> {
-                        selectedIndex = (selectedIndex + 1) % items.size
-                        true
-                    }
-                    Key.DirectionLeft -> {
-                        items[selectedIndex].onLeft()
-                        true
-                    }
-                    Key.DirectionRight -> {
-                        items[selectedIndex].onRight()
-                        true
-                    }
-                    Key.Enter, Key.DirectionCenter -> {
-                        items[selectedIndex].onSelect()
-                        true
-                    }
-                    Key.Back, Key.Escape -> {
-                        onDismiss()
-                        true
-                    }
-                    else -> false
-                }
-            },
-        contentAlignment = if (isVertical) Alignment.BottomCenter else Alignment.CenterEnd
+            .clickable { onDismiss() },
+        contentAlignment = Alignment.CenterEnd
     ) {
         Column(
             modifier = Modifier
-                .width(360.dp)
+                .width(320.dp)
                 .heightIn(max = 500.dp)
                 .background(Color.DarkGray.copy(alpha = 0.9f))
+                .clickable { /* prevent dismiss when clicking panel */ }
                 .padding(16.dp)
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -224,45 +208,43 @@ fun SettingsScreen(
             )
 
             items.forEachIndexed { index, item ->
-                val isSelected = index == selectedIndex
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            if (isSelected) Color.White.copy(alpha = 0.2f)
-                            else Color.Transparent
-                        )
-                        .then(
-                            if (isSelected) Modifier.border(1.dp, Color.White)
-                            else Modifier
-                        )
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(vertical = 2.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = item.label,
                         color = Color.White,
-                        fontSize = 16.sp
+                        fontSize = 14.sp
                     )
-                    Text(
-                        text = "◀ ${item.valueText} ▶",
-                        color = if (isSelected) Color.Yellow else Color.LightGray,
-                        fontSize = 16.sp
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "◀",
+                            color = Color.Yellow,
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .clickable { item.onLeft() }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                        Text(
+                            text = item.valueText,
+                            color = Color.LightGray,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = "▶",
+                            color = Color.Yellow,
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .clickable { item.onRight() }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
                 }
             }
         }
-    }
-
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
-    // Auto-scroll to keep selected item visible
-    androidx.compose.runtime.LaunchedEffect(selectedIndex) {
-        val itemHeight = 40 // approximate item height in pixels
-        val targetScroll = (selectedIndex * itemHeight - 100).coerceAtLeast(0)
-        scrollState.animateScrollTo(targetScroll)
     }
 }

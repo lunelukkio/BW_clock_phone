@@ -1,13 +1,12 @@
 package com.example.bw_clock.ui.theme
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.darkColorScheme
-import androidx.tv.material3.lightColorScheme
 
 data class ClockColors(
     val background: Color,
@@ -19,7 +18,6 @@ val LocalClockColors = staticCompositionLocalOf {
     ClockColors(background = ClockBlack, foreground = ClockWhite)
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun BW_clockTheme(
     isDarkBackground: Boolean = true,

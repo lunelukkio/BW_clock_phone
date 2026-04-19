@@ -37,7 +37,11 @@ data class ClockSettings(
     val burnInPrevention: Boolean = true,
     val showDate: Boolean = false,
     val datePosition: DatePosition = DatePosition.LEFT,
-    val dateSizePercent: Int = 100
+    val dateSizePercent: Int = 100,
+    val clockOffsetX: Int = 0,
+    val clockOffsetY: Int = 0,
+    val dateOffsetX: Int = 0,
+    val dateOffsetY: Int = 0
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "clock_settings")
@@ -56,6 +60,10 @@ object SettingsKeys {
     val SHOW_DATE = booleanPreferencesKey("show_date")
     val DATE_POSITION = intPreferencesKey("date_position")
     val DATE_SIZE_PERCENT = intPreferencesKey("date_size_percent")
+    val CLOCK_OFFSET_X = intPreferencesKey("clock_offset_x")
+    val CLOCK_OFFSET_Y = intPreferencesKey("clock_offset_y")
+    val DATE_OFFSET_X = intPreferencesKey("date_offset_x")
+    val DATE_OFFSET_Y = intPreferencesKey("date_offset_y")
 }
 
 class SettingsRepository(private val context: Context) {
@@ -74,7 +82,11 @@ class SettingsRepository(private val context: Context) {
             burnInPrevention = prefs[SettingsKeys.BURN_IN_PREVENTION] ?: true,
             showDate = prefs[SettingsKeys.SHOW_DATE] ?: false,
             datePosition = DatePosition.entries.getOrElse(prefs[SettingsKeys.DATE_POSITION] ?: 0) { DatePosition.LEFT },
-            dateSizePercent = prefs[SettingsKeys.DATE_SIZE_PERCENT] ?: 100
+            dateSizePercent = prefs[SettingsKeys.DATE_SIZE_PERCENT] ?: 100,
+            clockOffsetX = prefs[SettingsKeys.CLOCK_OFFSET_X] ?: 0,
+            clockOffsetY = prefs[SettingsKeys.CLOCK_OFFSET_Y] ?: 0,
+            dateOffsetX = prefs[SettingsKeys.DATE_OFFSET_X] ?: 0,
+            dateOffsetY = prefs[SettingsKeys.DATE_OFFSET_Y] ?: 0
         )
     }
 
@@ -128,6 +140,22 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun updateDateSizePercent(value: Int) {
         context.dataStore.edit { it[SettingsKeys.DATE_SIZE_PERCENT] = value.coerceIn(50, 300) }
+    }
+
+    suspend fun updateClockOffsetX(value: Int) {
+        context.dataStore.edit { it[SettingsKeys.CLOCK_OFFSET_X] = value.coerceIn(-500, 500) }
+    }
+
+    suspend fun updateClockOffsetY(value: Int) {
+        context.dataStore.edit { it[SettingsKeys.CLOCK_OFFSET_Y] = value.coerceIn(-500, 500) }
+    }
+
+    suspend fun updateDateOffsetX(value: Int) {
+        context.dataStore.edit { it[SettingsKeys.DATE_OFFSET_X] = value.coerceIn(-500, 500) }
+    }
+
+    suspend fun updateDateOffsetY(value: Int) {
+        context.dataStore.edit { it[SettingsKeys.DATE_OFFSET_Y] = value.coerceIn(-500, 500) }
     }
 
     suspend fun resetToDefaults() {
