@@ -1,7 +1,6 @@
 package com.example.bw_clock
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,7 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -32,155 +31,32 @@ data class SettingsItem(
     val label: String,
     val valueText: String,
     val onLeft: () -> Unit,
-    val onRight: () -> Unit,
-    val onSelect: () -> Unit = onRight
+    val onRight: () -> Unit
 )
 
 @Composable
 fun SettingsScreen(
-    settings: ClockSettings,
+    appSettings: ClockSettings,
+    widgetSettings: ClockSettings,
     repository: SettingsRepository,
     coroutineScope: CoroutineScope,
-    onDismiss: () -> Unit,
-    rotation: Int = 0
+    onDismiss: () -> Unit
 ) {
-    val isVertical = rotation == 90 || rotation == 270
+    var selectedScope by remember { mutableStateOf(SettingsScope.APP) }
+    val activeSettings = if (selectedScope == SettingsScope.APP) appSettings else widgetSettings
+
+    val isVertical = selectedScope == SettingsScope.APP &&
+        (appSettings.rotation == 90 || appSettings.rotation == 270)
     val datePositionLabel = if (isVertical) {
-        if (settings.datePosition == DatePosition.LEFT) "上" else "下"
+        if (activeSettings.datePosition == DatePosition.LEFT) "上" else "下"
     } else {
-        settings.datePosition.label
+        activeSettings.datePosition.label
     }
 
-    val items = remember(settings, isVertical) {
-        listOf(
-            SettingsItem(
-                label = "明るさ",
-                valueText = "${settings.brightnessPercent}%",
-                onLeft = { coroutineScope.launch { repository.updateBrightnessPercent(settings.brightnessPercent - 10) } },
-                onRight = { coroutineScope.launch { repository.updateBrightnessPercent(settings.brightnessPercent + 10) } }
-            ),
-            SettingsItem(
-                label = "テーマ",
-                valueText = if (settings.isDarkBackground) "黒背景" else "白背景",
-                onLeft = { coroutineScope.launch { repository.updateDarkBackground(!settings.isDarkBackground) } },
-                onRight = { coroutineScope.launch { repository.updateDarkBackground(!settings.isDarkBackground) } }
-            ),
-            SettingsItem(
-                label = "秒針",
-                valueText = if (settings.showSecondHand) "ON" else "OFF",
-                onLeft = { coroutineScope.launch { repository.updateShowSecondHand(!settings.showSecondHand) } },
-                onRight = { coroutineScope.launch { repository.updateShowSecondHand(!settings.showSecondHand) } }
-            ),
-            SettingsItem(
-                label = "数字",
-                valueText = if (settings.showNumbers) "ON" else "OFF",
-                onLeft = { coroutineScope.launch { repository.updateShowNumbers(!settings.showNumbers) } },
-                onRight = { coroutineScope.launch { repository.updateShowNumbers(!settings.showNumbers) } }
-            ),
-            SettingsItem(
-                label = "目盛り",
-                valueText = if (settings.showTickMarks) "ON" else "OFF",
-                onLeft = { coroutineScope.launch { repository.updateShowTickMarks(!settings.showTickMarks) } },
-                onRight = { coroutineScope.launch { repository.updateShowTickMarks(!settings.showTickMarks) } }
-            ),
-            SettingsItem(
-                label = "外枠",
-                valueText = if (settings.showFrame) "ON" else "OFF",
-                onLeft = { coroutineScope.launch { repository.updateShowFrame(!settings.showFrame) } },
-                onRight = { coroutineScope.launch { repository.updateShowFrame(!settings.showFrame) } }
-            ),
-            SettingsItem(
-                label = "フォント",
-                valueText = settings.clockFont.label,
-                onLeft = {
-                    val fonts = ClockFont.entries
-                    val prev = fonts[(settings.clockFont.ordinal - 1 + fonts.size) % fonts.size]
-                    coroutineScope.launch { repository.updateClockFont(prev) }
-                },
-                onRight = {
-                    val fonts = ClockFont.entries
-                    val next = fonts[(settings.clockFont.ordinal + 1) % fonts.size]
-                    coroutineScope.launch { repository.updateClockFont(next) }
-                }
-            ),
-            SettingsItem(
-                label = "サイズ",
-                valueText = "${settings.clockSizePercent}%",
-                onLeft = { coroutineScope.launch { repository.updateClockSizePercent(settings.clockSizePercent - 10) } },
-                onRight = { coroutineScope.launch { repository.updateClockSizePercent(settings.clockSizePercent + 10) } }
-            ),
-            SettingsItem(
-                label = "時計 横位置",
-                valueText = "${settings.clockOffsetX}%",
-                onLeft = { coroutineScope.launch { repository.updateClockOffsetX(settings.clockOffsetX - 5) } },
-                onRight = { coroutineScope.launch { repository.updateClockOffsetX(settings.clockOffsetX + 5) } }
-            ),
-            SettingsItem(
-                label = "時計 縦位置",
-                valueText = "${settings.clockOffsetY}%",
-                onLeft = { coroutineScope.launch { repository.updateClockOffsetY(settings.clockOffsetY - 5) } },
-                onRight = { coroutineScope.launch { repository.updateClockOffsetY(settings.clockOffsetY + 5) } }
-            ),
-            SettingsItem(
-                label = "日付",
-                valueText = if (settings.showDate) "ON" else "OFF",
-                onLeft = { coroutineScope.launch { repository.updateShowDate(!settings.showDate) } },
-                onRight = { coroutineScope.launch { repository.updateShowDate(!settings.showDate) } }
-            ),
-            SettingsItem(
-                label = "日付位置",
-                valueText = datePositionLabel,
-                onLeft = {
-                    val positions = DatePosition.entries
-                    val prev = positions[(settings.datePosition.ordinal - 1 + positions.size) % positions.size]
-                    coroutineScope.launch { repository.updateDatePosition(prev) }
-                },
-                onRight = {
-                    val positions = DatePosition.entries
-                    val next = positions[(settings.datePosition.ordinal + 1) % positions.size]
-                    coroutineScope.launch { repository.updateDatePosition(next) }
-                }
-            ),
-            SettingsItem(
-                label = "日付サイズ",
-                valueText = "${settings.dateSizePercent}%",
-                onLeft = { coroutineScope.launch { repository.updateDateSizePercent(settings.dateSizePercent - 10) } },
-                onRight = { coroutineScope.launch { repository.updateDateSizePercent(settings.dateSizePercent + 10) } }
-            ),
-            SettingsItem(
-                label = "日付 横位置",
-                valueText = "${settings.dateOffsetX}%",
-                onLeft = { coroutineScope.launch { repository.updateDateOffsetX(settings.dateOffsetX - 5) } },
-                onRight = { coroutineScope.launch { repository.updateDateOffsetX(settings.dateOffsetX + 5) } }
-            ),
-            SettingsItem(
-                label = "日付 縦位置",
-                valueText = "${settings.dateOffsetY}%",
-                onLeft = { coroutineScope.launch { repository.updateDateOffsetY(settings.dateOffsetY - 5) } },
-                onRight = { coroutineScope.launch { repository.updateDateOffsetY(settings.dateOffsetY + 5) } }
-            ),
-            SettingsItem(
-                label = "焼付防止",
-                valueText = if (settings.burnInPrevention) "ON" else "OFF",
-                onLeft = { coroutineScope.launch { repository.updateBurnInPrevention(!settings.burnInPrevention) } },
-                onRight = { coroutineScope.launch { repository.updateBurnInPrevention(!settings.burnInPrevention) } }
-            ),
-            SettingsItem(
-                label = "回転",
-                valueText = "${settings.rotation}°",
-                onLeft = { coroutineScope.launch { repository.updateRotation(settings.rotation - 90) } },
-                onRight = { coroutineScope.launch { repository.updateRotation(settings.rotation + 90) } }
-            ),
-            SettingsItem(
-                label = "リセット",
-                valueText = "初期状態に戻す",
-                onLeft = { coroutineScope.launch { repository.resetToDefaults() } },
-                onRight = { coroutineScope.launch { repository.resetToDefaults() } }
-            )
-        )
+    val items = remember(activeSettings, isVertical, selectedScope) {
+        buildSettingsItems(selectedScope, activeSettings, datePositionLabel, repository, coroutineScope)
     }
 
-    var selectedIndex by remember { mutableIntStateOf(0) }
     val scrollState = rememberScrollState()
 
     Box(
@@ -193,11 +69,10 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .width(320.dp)
-                .heightIn(max = 500.dp)
+                .heightIn(max = 560.dp)
                 .background(Color.DarkGray.copy(alpha = 0.9f))
                 .clickable { /* prevent dismiss when clicking panel */ }
-                .padding(16.dp)
-                .verticalScroll(scrollState),
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
@@ -207,44 +82,232 @@ fun SettingsScreen(
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            items.forEachIndexed { index, item ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = item.label,
-                        color = Color.White,
-                        fontSize = 14.sp
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TabButton("本体", selectedScope == SettingsScope.APP) {
+                    selectedScope = SettingsScope.APP
+                }
+                TabButton("ウィジェット", selectedScope == SettingsScope.WIDGET) {
+                    selectedScope = SettingsScope.WIDGET
+                }
+            }
+
+            Column(
+                modifier = Modifier.verticalScroll(scrollState),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items.forEach { item ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            text = "◀",
-                            color = Color.Yellow,
-                            fontSize = 14.sp,
-                            modifier = Modifier
-                                .clickable { item.onLeft() }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                        Text(
-                            text = item.valueText,
-                            color = Color.LightGray,
+                            text = item.label,
+                            color = Color.White,
                             fontSize = 14.sp
                         )
-                        Text(
-                            text = "▶",
-                            color = Color.Yellow,
-                            fontSize = 14.sp,
-                            modifier = Modifier
-                                .clickable { item.onRight() }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "◀",
+                                color = Color.Yellow,
+                                fontSize = 14.sp,
+                                modifier = Modifier
+                                    .clickable { item.onLeft() }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                            Text(
+                                text = item.valueText,
+                                color = Color.LightGray,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = "▶",
+                                color = Color.Yellow,
+                                fontSize = 14.sp,
+                                modifier = Modifier
+                                    .clickable { item.onRight() }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun TabButton(label: String, selected: Boolean, onClick: () -> Unit) {
+    val bg = if (selected) Color.White.copy(alpha = 0.25f) else Color.Transparent
+    val fg = if (selected) Color.White else Color.LightGray
+    Text(
+        text = label,
+        color = fg,
+        fontSize = 14.sp,
+        modifier = Modifier
+            .background(bg)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    )
+}
+
+private fun buildSettingsItems(
+    scope: SettingsScope,
+    s: ClockSettings,
+    datePositionLabel: String,
+    repo: SettingsRepository,
+    cs: CoroutineScope
+): List<SettingsItem> {
+    val items = mutableListOf<SettingsItem>()
+
+    if (scope == SettingsScope.APP) {
+        items += SettingsItem(
+            label = "明るさ",
+            valueText = "${s.brightnessPercent}%",
+            onLeft = { cs.launch { repo.updateBrightnessPercent(scope, s.brightnessPercent - 10) } },
+            onRight = { cs.launch { repo.updateBrightnessPercent(scope, s.brightnessPercent + 10) } }
+        )
+    }
+
+    items += SettingsItem(
+        label = "テーマ",
+        valueText = if (s.isDarkBackground) "黒背景" else "白背景",
+        onLeft = { cs.launch { repo.updateDarkBackground(scope, !s.isDarkBackground) } },
+        onRight = { cs.launch { repo.updateDarkBackground(scope, !s.isDarkBackground) } }
+    )
+
+    if (scope == SettingsScope.APP) {
+        items += SettingsItem(
+            label = "秒針",
+            valueText = if (s.showSecondHand) "ON" else "OFF",
+            onLeft = { cs.launch { repo.updateShowSecondHand(scope, !s.showSecondHand) } },
+            onRight = { cs.launch { repo.updateShowSecondHand(scope, !s.showSecondHand) } }
+        )
+    }
+
+    items += SettingsItem(
+        label = "数字大きさ",
+        valueText = "${s.numberScale}%",
+        onLeft = { cs.launch { repo.updateNumberScale(scope, s.numberScale - 25) } },
+        onRight = { cs.launch { repo.updateNumberScale(scope, s.numberScale + 25) } }
+    )
+    items += SettingsItem(
+        label = "5分ドット",
+        valueText = "${s.majorTickScale}%",
+        onLeft = { cs.launch { repo.updateMajorTickScale(scope, s.majorTickScale - 25) } },
+        onRight = { cs.launch { repo.updateMajorTickScale(scope, s.majorTickScale + 25) } }
+    )
+    items += SettingsItem(
+        label = "1分ドット",
+        valueText = "${s.minorTickScale}%",
+        onLeft = { cs.launch { repo.updateMinorTickScale(scope, s.minorTickScale - 25) } },
+        onRight = { cs.launch { repo.updateMinorTickScale(scope, s.minorTickScale + 25) } }
+    )
+    items += SettingsItem(
+        label = "外枠",
+        valueText = if (s.showFrame) "ON" else "OFF",
+        onLeft = { cs.launch { repo.updateShowFrame(scope, !s.showFrame) } },
+        onRight = { cs.launch { repo.updateShowFrame(scope, !s.showFrame) } }
+    )
+    items += SettingsItem(
+        label = "フォント",
+        valueText = s.clockFont.label,
+        onLeft = {
+            val fonts = ClockFont.entries
+            val prev = fonts[(s.clockFont.ordinal - 1 + fonts.size) % fonts.size]
+            cs.launch { repo.updateClockFont(scope, prev) }
+        },
+        onRight = {
+            val fonts = ClockFont.entries
+            val next = fonts[(s.clockFont.ordinal + 1) % fonts.size]
+            cs.launch { repo.updateClockFont(scope, next) }
+        }
+    )
+    items += SettingsItem(
+        label = "サイズ",
+        valueText = "${s.clockSizePercent}%",
+        onLeft = { cs.launch { repo.updateClockSizePercent(scope, s.clockSizePercent - 10) } },
+        onRight = { cs.launch { repo.updateClockSizePercent(scope, s.clockSizePercent + 10) } }
+    )
+    items += SettingsItem(
+        label = "時計 横位置",
+        valueText = "${s.clockOffsetX}%",
+        onLeft = { cs.launch { repo.updateClockOffsetX(scope, s.clockOffsetX - 5) } },
+        onRight = { cs.launch { repo.updateClockOffsetX(scope, s.clockOffsetX + 5) } }
+    )
+    items += SettingsItem(
+        label = "時計 縦位置",
+        valueText = "${s.clockOffsetY}%",
+        onLeft = { cs.launch { repo.updateClockOffsetY(scope, s.clockOffsetY - 5) } },
+        onRight = { cs.launch { repo.updateClockOffsetY(scope, s.clockOffsetY + 5) } }
+    )
+    items += SettingsItem(
+        label = "日付",
+        valueText = if (s.showDate) "ON" else "OFF",
+        onLeft = { cs.launch { repo.updateShowDate(scope, !s.showDate) } },
+        onRight = { cs.launch { repo.updateShowDate(scope, !s.showDate) } }
+    )
+    items += SettingsItem(
+        label = "日付位置",
+        valueText = datePositionLabel,
+        onLeft = {
+            val positions = DatePosition.entries
+            val prev = positions[(s.datePosition.ordinal - 1 + positions.size) % positions.size]
+            cs.launch { repo.updateDatePosition(scope, prev) }
+        },
+        onRight = {
+            val positions = DatePosition.entries
+            val next = positions[(s.datePosition.ordinal + 1) % positions.size]
+            cs.launch { repo.updateDatePosition(scope, next) }
+        }
+    )
+    items += SettingsItem(
+        label = "日付サイズ",
+        valueText = "${s.dateSizePercent}%",
+        onLeft = { cs.launch { repo.updateDateSizePercent(scope, s.dateSizePercent - 10) } },
+        onRight = { cs.launch { repo.updateDateSizePercent(scope, s.dateSizePercent + 10) } }
+    )
+    items += SettingsItem(
+        label = "日付 横位置",
+        valueText = "${s.dateOffsetX}%",
+        onLeft = { cs.launch { repo.updateDateOffsetX(scope, s.dateOffsetX - 5) } },
+        onRight = { cs.launch { repo.updateDateOffsetX(scope, s.dateOffsetX + 5) } }
+    )
+    items += SettingsItem(
+        label = "日付 縦位置",
+        valueText = "${s.dateOffsetY}%",
+        onLeft = { cs.launch { repo.updateDateOffsetY(scope, s.dateOffsetY - 5) } },
+        onRight = { cs.launch { repo.updateDateOffsetY(scope, s.dateOffsetY + 5) } }
+    )
+
+    if (scope == SettingsScope.APP) {
+        items += SettingsItem(
+            label = "焼付防止",
+            valueText = if (s.burnInPrevention) "ON" else "OFF",
+            onLeft = { cs.launch { repo.updateBurnInPrevention(scope, !s.burnInPrevention) } },
+            onRight = { cs.launch { repo.updateBurnInPrevention(scope, !s.burnInPrevention) } }
+        )
+        items += SettingsItem(
+            label = "回転",
+            valueText = "${s.rotation}°",
+            onLeft = { cs.launch { repo.updateRotation(scope, s.rotation - 90) } },
+            onRight = { cs.launch { repo.updateRotation(scope, s.rotation + 90) } }
+        )
+    }
+
+    items += SettingsItem(
+        label = "リセット",
+        valueText = "初期状態に戻す",
+        onLeft = { cs.launch { repo.resetToDefaults(scope) } },
+        onRight = { cs.launch { repo.resetToDefaults(scope) } }
+    )
+
+    return items
 }
