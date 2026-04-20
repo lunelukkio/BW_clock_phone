@@ -10,17 +10,23 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-enum class ClockFont(val label: String) {
-    DEFAULT("デフォルト"),
-    SERIF("セリフ"),
-    MONOSPACE("等幅"),
-    SANS_SERIF_LIGHT("細字"),
-    SANS_SERIF_BOLD("太字");
+enum class ClockFont {
+    DEFAULT,
+    SERIF,
+    MONOSPACE,
+    SANS_SERIF_LIGHT,
+    SANS_SERIF_BOLD;
 }
 
-enum class DatePosition(val label: String) {
-    LEFT("左"),
-    RIGHT("右");
+enum class DatePosition {
+    LEFT,
+    RIGHT;
+}
+
+enum class HandTipStyle {
+    ROUNDED,
+    SQUARED,
+    TAPERED;
 }
 
 enum class SettingsScope(val prefix: String) {
@@ -46,7 +52,9 @@ data class ClockSettings(
     val dateOffsetY: Int = 0,
     val majorTickScale: Int = 100,
     val minorTickScale: Int = 100,
-    val numberScale: Int = 100
+    val numberScale: Int = 100,
+    val handTipStyle: HandTipStyle = HandTipStyle.ROUNDED,
+    val handThicknessScale: Int = 100
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "clock_settings")
@@ -71,13 +79,16 @@ class ScopedKeys(scope: SettingsScope) {
     val MAJOR_TICK_SCALE = intPreferencesKey("${p}major_tick_scale")
     val MINOR_TICK_SCALE = intPreferencesKey("${p}minor_tick_scale")
     val NUMBER_SCALE = intPreferencesKey("${p}number_scale")
+    val HAND_TIP_STYLE = intPreferencesKey("${p}hand_tip_style")
+    val HAND_THICKNESS_SCALE = intPreferencesKey("${p}hand_thickness_scale")
 
     val all: List<Preferences.Key<*>> = listOf(
         IS_DARK_BACKGROUND, SHOW_SECOND_HAND, SHOW_FRAME, BRIGHTNESS_PERCENT,
         CLOCK_SIZE_PERCENT, CLOCK_FONT, ROTATION, BURN_IN_PREVENTION,
         SHOW_DATE, DATE_POSITION, DATE_SIZE_PERCENT,
         CLOCK_OFFSET_X, CLOCK_OFFSET_Y, DATE_OFFSET_X, DATE_OFFSET_Y,
-        MAJOR_TICK_SCALE, MINOR_TICK_SCALE, NUMBER_SCALE
+        MAJOR_TICK_SCALE, MINOR_TICK_SCALE, NUMBER_SCALE,
+        HAND_TIP_STYLE, HAND_THICKNESS_SCALE
     )
 }
 
@@ -102,6 +113,8 @@ private object LegacyKeys {
     val MAJOR_TICK_SCALE = intPreferencesKey("major_tick_scale")
     val MINOR_TICK_SCALE = intPreferencesKey("minor_tick_scale")
     val NUMBER_SCALE = intPreferencesKey("number_scale")
+    val HAND_TIP_STYLE = intPreferencesKey("hand_tip_style")
+    val HAND_THICKNESS_SCALE = intPreferencesKey("hand_thickness_scale")
 }
 
 class SettingsRepository(private val context: Context) {
@@ -134,7 +147,11 @@ class SettingsRepository(private val context: Context) {
                 dateOffsetY = prefs[k.DATE_OFFSET_Y] ?: prefs[LegacyKeys.DATE_OFFSET_Y] ?: 0,
                 majorTickScale = prefs[k.MAJOR_TICK_SCALE] ?: prefs[LegacyKeys.MAJOR_TICK_SCALE] ?: 100,
                 minorTickScale = prefs[k.MINOR_TICK_SCALE] ?: prefs[LegacyKeys.MINOR_TICK_SCALE] ?: 100,
-                numberScale = prefs[k.NUMBER_SCALE] ?: prefs[LegacyKeys.NUMBER_SCALE] ?: 100
+                numberScale = prefs[k.NUMBER_SCALE] ?: prefs[LegacyKeys.NUMBER_SCALE] ?: 100,
+                handTipStyle = HandTipStyle.entries.getOrElse(
+                    prefs[k.HAND_TIP_STYLE] ?: prefs[LegacyKeys.HAND_TIP_STYLE] ?: 0
+                ) { HandTipStyle.ROUNDED },
+                handThicknessScale = prefs[k.HAND_THICKNESS_SCALE] ?: prefs[LegacyKeys.HAND_THICKNESS_SCALE] ?: 100
             )
         }
     }
@@ -211,6 +228,14 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit { it[ScopedKeys(scope).NUMBER_SCALE] = value.coerceIn(0, 500) }
     }
 
+    suspend fun updateHandTipStyle(scope: SettingsScope, value: HandTipStyle) {
+        context.dataStore.edit { it[ScopedKeys(scope).HAND_TIP_STYLE] = value.ordinal }
+    }
+
+    suspend fun updateHandThicknessScale(scope: SettingsScope, value: Int) {
+        context.dataStore.edit { it[ScopedKeys(scope).HAND_THICKNESS_SCALE] = value.coerceIn(0, 500) }
+    }
+
     suspend fun resetToDefaults(scope: SettingsScope) {
         val keys = ScopedKeys(scope)
         val defaults = ClockSettings()
@@ -233,6 +258,8 @@ class SettingsRepository(private val context: Context) {
             prefs[keys.MAJOR_TICK_SCALE] = defaults.majorTickScale
             prefs[keys.MINOR_TICK_SCALE] = defaults.minorTickScale
             prefs[keys.NUMBER_SCALE] = defaults.numberScale
+            prefs[keys.HAND_TIP_STYLE] = defaults.handTipStyle.ordinal
+            prefs[keys.HAND_THICKNESS_SCALE] = defaults.handThicknessScale
         }
     }
 }

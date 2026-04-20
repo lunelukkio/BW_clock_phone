@@ -22,8 +22,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -47,15 +50,8 @@ fun SettingsScreen(
 
     val isVertical = selectedScope == SettingsScope.APP &&
         (appSettings.rotation == 90 || appSettings.rotation == 270)
-    val datePositionLabel = if (isVertical) {
-        if (activeSettings.datePosition == DatePosition.LEFT) "上" else "下"
-    } else {
-        activeSettings.datePosition.label
-    }
 
-    val items = remember(activeSettings, isVertical, selectedScope) {
-        buildSettingsItems(selectedScope, activeSettings, datePositionLabel, repository, coroutineScope)
-    }
+    val items = buildSettingsItems(selectedScope, activeSettings, isVertical, repository, coroutineScope)
 
     val scrollState = rememberScrollState()
 
@@ -76,7 +72,7 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
-                text = "設定",
+                text = stringResource(R.string.settings_title),
                 color = Color.White,
                 fontSize = 20.sp,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -88,10 +84,10 @@ fun SettingsScreen(
                     .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                TabButton("本体", selectedScope == SettingsScope.APP) {
+                TabButton(stringResource(R.string.tab_app), selectedScope == SettingsScope.APP) {
                     selectedScope = SettingsScope.APP
                 }
-                TabButton("ウィジェット", selectedScope == SettingsScope.WIDGET) {
+                TabButton(stringResource(R.string.tab_widget), selectedScope == SettingsScope.WIDGET) {
                     selectedScope = SettingsScope.WIDGET
                 }
             }
@@ -115,7 +111,7 @@ fun SettingsScreen(
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "◀",
+                                text = "\u25C0",
                                 color = Color.Yellow,
                                 fontSize = 14.sp,
                                 modifier = Modifier
@@ -128,7 +124,7 @@ fun SettingsScreen(
                                 fontSize = 14.sp
                             )
                             Text(
-                                text = "▶",
+                                text = "\u25B6",
                                 color = Color.Yellow,
                                 fontSize = 14.sp,
                                 modifier = Modifier
@@ -158,18 +154,58 @@ private fun TabButton(label: String, selected: Boolean, onClick: () -> Unit) {
     )
 }
 
+@Composable
 private fun buildSettingsItems(
     scope: SettingsScope,
     s: ClockSettings,
-    datePositionLabel: String,
+    isVertical: Boolean,
     repo: SettingsRepository,
     cs: CoroutineScope
 ): List<SettingsItem> {
+    val on = stringResource(R.string.value_on)
+    val off = stringResource(R.string.value_off)
+
+    val datePositionText = when {
+        isVertical && s.datePosition == DatePosition.LEFT -> stringResource(R.string.date_pos_top)
+        isVertical -> stringResource(R.string.date_pos_bottom)
+        s.datePosition == DatePosition.LEFT -> stringResource(R.string.date_pos_left)
+        else -> stringResource(R.string.date_pos_right)
+    }
+    val fontText = s.clockFont.localizedLabel()
+    val handTipText = s.handTipStyle.localizedLabel()
+    val themeText = if (s.isDarkBackground) stringResource(R.string.theme_dark) else stringResource(R.string.theme_light)
+
+    val labelBrightness = stringResource(R.string.label_brightness)
+    val labelTheme = stringResource(R.string.label_theme)
+    val labelSecondHand = stringResource(R.string.label_second_hand)
+    val labelFrame = stringResource(R.string.label_frame)
+    val labelNumberScale = stringResource(R.string.label_number_scale)
+    val labelMajorTick = stringResource(R.string.label_major_tick)
+    val labelMinorTick = stringResource(R.string.label_minor_tick)
+    val labelFont = stringResource(R.string.label_font)
+    val labelSize = stringResource(R.string.label_size)
+    val labelClockOffsetX = stringResource(R.string.label_clock_offset_x)
+    val labelClockOffsetY = stringResource(R.string.label_clock_offset_y)
+    val labelDate = stringResource(R.string.label_date)
+    val labelDatePosition = stringResource(R.string.label_date_position)
+    val labelDateSize = stringResource(R.string.label_date_size)
+    val labelDateOffsetX = stringResource(R.string.label_date_offset_x)
+    val labelDateOffsetY = stringResource(R.string.label_date_offset_y)
+    val labelHandTip = stringResource(R.string.label_hand_tip)
+    val labelHandThickness = stringResource(R.string.label_hand_thickness)
+    val labelBurnIn = stringResource(R.string.label_burn_in)
+    val labelRotation = stringResource(R.string.label_rotation)
+    val labelLanguage = stringResource(R.string.label_language)
+    val languageJa = stringResource(R.string.language_ja)
+    val languageEn = stringResource(R.string.language_en)
+    val labelReset = stringResource(R.string.label_reset)
+    val resetAction = stringResource(R.string.reset_action)
+
     val items = mutableListOf<SettingsItem>()
 
     if (scope == SettingsScope.APP) {
         items += SettingsItem(
-            label = "明るさ",
+            label = labelBrightness,
             valueText = "${s.brightnessPercent}%",
             onLeft = { cs.launch { repo.updateBrightnessPercent(scope, s.brightnessPercent - 10) } },
             onRight = { cs.launch { repo.updateBrightnessPercent(scope, s.brightnessPercent + 10) } }
@@ -177,48 +213,48 @@ private fun buildSettingsItems(
     }
 
     items += SettingsItem(
-        label = "テーマ",
-        valueText = if (s.isDarkBackground) "黒背景" else "白背景",
+        label = labelTheme,
+        valueText = themeText,
         onLeft = { cs.launch { repo.updateDarkBackground(scope, !s.isDarkBackground) } },
         onRight = { cs.launch { repo.updateDarkBackground(scope, !s.isDarkBackground) } }
     )
 
     if (scope == SettingsScope.APP) {
         items += SettingsItem(
-            label = "秒針",
-            valueText = if (s.showSecondHand) "ON" else "OFF",
+            label = labelSecondHand,
+            valueText = if (s.showSecondHand) on else off,
             onLeft = { cs.launch { repo.updateShowSecondHand(scope, !s.showSecondHand) } },
             onRight = { cs.launch { repo.updateShowSecondHand(scope, !s.showSecondHand) } }
         )
     }
 
     items += SettingsItem(
-        label = "数字大きさ",
+        label = labelFrame,
+        valueText = if (s.showFrame) on else off,
+        onLeft = { cs.launch { repo.updateShowFrame(scope, !s.showFrame) } },
+        onRight = { cs.launch { repo.updateShowFrame(scope, !s.showFrame) } }
+    )
+    items += SettingsItem(
+        label = labelNumberScale,
         valueText = "${s.numberScale}%",
         onLeft = { cs.launch { repo.updateNumberScale(scope, s.numberScale - 25) } },
         onRight = { cs.launch { repo.updateNumberScale(scope, s.numberScale + 25) } }
     )
     items += SettingsItem(
-        label = "5分ドット",
+        label = labelMajorTick,
         valueText = "${s.majorTickScale}%",
         onLeft = { cs.launch { repo.updateMajorTickScale(scope, s.majorTickScale - 25) } },
         onRight = { cs.launch { repo.updateMajorTickScale(scope, s.majorTickScale + 25) } }
     )
     items += SettingsItem(
-        label = "1分ドット",
+        label = labelMinorTick,
         valueText = "${s.minorTickScale}%",
         onLeft = { cs.launch { repo.updateMinorTickScale(scope, s.minorTickScale - 25) } },
         onRight = { cs.launch { repo.updateMinorTickScale(scope, s.minorTickScale + 25) } }
     )
     items += SettingsItem(
-        label = "外枠",
-        valueText = if (s.showFrame) "ON" else "OFF",
-        onLeft = { cs.launch { repo.updateShowFrame(scope, !s.showFrame) } },
-        onRight = { cs.launch { repo.updateShowFrame(scope, !s.showFrame) } }
-    )
-    items += SettingsItem(
-        label = "フォント",
-        valueText = s.clockFont.label,
+        label = labelFont,
+        valueText = fontText,
         onLeft = {
             val fonts = ClockFont.entries
             val prev = fonts[(s.clockFont.ordinal - 1 + fonts.size) % fonts.size]
@@ -231,32 +267,52 @@ private fun buildSettingsItems(
         }
     )
     items += SettingsItem(
-        label = "サイズ",
+        label = labelHandTip,
+        valueText = handTipText,
+        onLeft = {
+            val styles = HandTipStyle.entries
+            val prev = styles[(s.handTipStyle.ordinal - 1 + styles.size) % styles.size]
+            cs.launch { repo.updateHandTipStyle(scope, prev) }
+        },
+        onRight = {
+            val styles = HandTipStyle.entries
+            val next = styles[(s.handTipStyle.ordinal + 1) % styles.size]
+            cs.launch { repo.updateHandTipStyle(scope, next) }
+        }
+    )
+    items += SettingsItem(
+        label = labelHandThickness,
+        valueText = "${s.handThicknessScale}%",
+        onLeft = { cs.launch { repo.updateHandThicknessScale(scope, s.handThicknessScale - 5) } },
+        onRight = { cs.launch { repo.updateHandThicknessScale(scope, s.handThicknessScale + 5) } }
+    )
+    items += SettingsItem(
+        label = labelSize,
         valueText = "${s.clockSizePercent}%",
         onLeft = { cs.launch { repo.updateClockSizePercent(scope, s.clockSizePercent - 10) } },
         onRight = { cs.launch { repo.updateClockSizePercent(scope, s.clockSizePercent + 10) } }
     )
     items += SettingsItem(
-        label = "時計 横位置",
+        label = labelClockOffsetX,
         valueText = "${s.clockOffsetX}%",
         onLeft = { cs.launch { repo.updateClockOffsetX(scope, s.clockOffsetX - 5) } },
         onRight = { cs.launch { repo.updateClockOffsetX(scope, s.clockOffsetX + 5) } }
     )
     items += SettingsItem(
-        label = "時計 縦位置",
+        label = labelClockOffsetY,
         valueText = "${s.clockOffsetY}%",
         onLeft = { cs.launch { repo.updateClockOffsetY(scope, s.clockOffsetY - 5) } },
         onRight = { cs.launch { repo.updateClockOffsetY(scope, s.clockOffsetY + 5) } }
     )
     items += SettingsItem(
-        label = "日付",
-        valueText = if (s.showDate) "ON" else "OFF",
+        label = labelDate,
+        valueText = if (s.showDate) on else off,
         onLeft = { cs.launch { repo.updateShowDate(scope, !s.showDate) } },
         onRight = { cs.launch { repo.updateShowDate(scope, !s.showDate) } }
     )
     items += SettingsItem(
-        label = "日付位置",
-        valueText = datePositionLabel,
+        label = labelDatePosition,
+        valueText = datePositionText,
         onLeft = {
             val positions = DatePosition.entries
             val prev = positions[(s.datePosition.ordinal - 1 + positions.size) % positions.size]
@@ -269,19 +325,19 @@ private fun buildSettingsItems(
         }
     )
     items += SettingsItem(
-        label = "日付サイズ",
+        label = labelDateSize,
         valueText = "${s.dateSizePercent}%",
         onLeft = { cs.launch { repo.updateDateSizePercent(scope, s.dateSizePercent - 10) } },
         onRight = { cs.launch { repo.updateDateSizePercent(scope, s.dateSizePercent + 10) } }
     )
     items += SettingsItem(
-        label = "日付 横位置",
+        label = labelDateOffsetX,
         valueText = "${s.dateOffsetX}%",
         onLeft = { cs.launch { repo.updateDateOffsetX(scope, s.dateOffsetX - 5) } },
         onRight = { cs.launch { repo.updateDateOffsetX(scope, s.dateOffsetX + 5) } }
     )
     items += SettingsItem(
-        label = "日付 縦位置",
+        label = labelDateOffsetY,
         valueText = "${s.dateOffsetY}%",
         onLeft = { cs.launch { repo.updateDateOffsetY(scope, s.dateOffsetY - 5) } },
         onRight = { cs.launch { repo.updateDateOffsetY(scope, s.dateOffsetY + 5) } }
@@ -289,25 +345,56 @@ private fun buildSettingsItems(
 
     if (scope == SettingsScope.APP) {
         items += SettingsItem(
-            label = "焼付防止",
-            valueText = if (s.burnInPrevention) "ON" else "OFF",
+            label = labelBurnIn,
+            valueText = if (s.burnInPrevention) on else off,
             onLeft = { cs.launch { repo.updateBurnInPrevention(scope, !s.burnInPrevention) } },
             onRight = { cs.launch { repo.updateBurnInPrevention(scope, !s.burnInPrevention) } }
         )
         items += SettingsItem(
-            label = "回転",
+            label = labelRotation,
             valueText = "${s.rotation}°",
             onLeft = { cs.launch { repo.updateRotation(scope, s.rotation - 90) } },
             onRight = { cs.launch { repo.updateRotation(scope, s.rotation + 90) } }
         )
     }
 
+    val currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags()
+    val langIsEn = currentLang.startsWith("en")
+    val langValueText = if (langIsEn) languageEn else languageJa
     items += SettingsItem(
-        label = "リセット",
-        valueText = "初期状態に戻す",
+        label = labelLanguage,
+        valueText = langValueText,
+        onLeft = { toggleLanguage(langIsEn) },
+        onRight = { toggleLanguage(langIsEn) }
+    )
+
+    items += SettingsItem(
+        label = labelReset,
+        valueText = resetAction,
         onLeft = { cs.launch { repo.resetToDefaults(scope) } },
         onRight = { cs.launch { repo.resetToDefaults(scope) } }
     )
 
     return items
+}
+
+private fun toggleLanguage(currentlyEnglish: Boolean) {
+    val target = if (currentlyEnglish) "ja" else "en"
+    AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(target))
+}
+
+@Composable
+private fun ClockFont.localizedLabel(): String = when (this) {
+    ClockFont.DEFAULT -> stringResource(R.string.font_default)
+    ClockFont.SERIF -> stringResource(R.string.font_serif)
+    ClockFont.MONOSPACE -> stringResource(R.string.font_monospace)
+    ClockFont.SANS_SERIF_LIGHT -> stringResource(R.string.font_light)
+    ClockFont.SANS_SERIF_BOLD -> stringResource(R.string.font_bold)
+}
+
+@Composable
+private fun HandTipStyle.localizedLabel(): String = when (this) {
+    HandTipStyle.ROUNDED -> stringResource(R.string.hand_tip_rounded)
+    HandTipStyle.SQUARED -> stringResource(R.string.hand_tip_squared)
+    HandTipStyle.TAPERED -> stringResource(R.string.hand_tip_tapered)
 }

@@ -50,4 +50,7 @@ Same `ClockSettings` data class is used for both scopes, but the widget ignores 
 - The TV-version key handling (`onKeyEvent`, `FocusRequester`, `focusable`) was removed in the phone port. Do not reintroduce Leanback or `androidx.tv.*` dependencies.
 - `AndroidManifest.xml` is locked to `screenOrientation="portrait"`; in-app rotation uses Compose `graphicsLayer` instead of activity rotation.
 - Tick dot size is controlled by `majorTickScale` / `minorTickScale` (0–500%), and number size by `numberScale` (0–500%). 0% means hidden. There is no separate ON/OFF toggle for ticks or numbers.
+- Hand tips are styled by `handTipStyle` (ROUNDED / SQUARED / TAPERED); TAPERED is drawn as a filled `Path` triangle while the other two are stroke lines with `Paint.Cap.ROUND` / `Paint.Cap.BUTT`.
+- Hand thickness is controlled by `handThicknessScale` (0–500%, 5% step, default 100%). 0% skips the hand draw entirely.
+- Language is switched at runtime via `AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("ja"|"en"))`. All user-facing strings live in `res/values/strings.xml` (ja) and `res/values-en/strings.xml` (en); `MainActivity` extends `AppCompatActivity` for per-app locale support.
 - The widget cannot update more often than once per minute, so the app's second-hand cannot be mirrored there.

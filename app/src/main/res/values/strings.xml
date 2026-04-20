@@ -1,4 +1,50 @@
 <resources>
     <string name="app_name">BW_clock</string>
     <string name="widget_description">BW アナログ時計</string>
+
+    <string name="settings_title">設定</string>
+    <string name="tab_app">本体</string>
+    <string name="tab_widget">ウィジェット</string>
+
+    <string name="label_brightness">明るさ</string>
+    <string name="label_theme">テーマ</string>
+    <string name="theme_dark">黒背景</string>
+    <string name="theme_light">白背景</string>
+    <string name="label_second_hand">秒針</string>
+    <string name="value_on">ON</string>
+    <string name="value_off">OFF</string>
+    <string name="label_frame">外枠</string>
+    <string name="label_font">フォント</string>
+    <string name="font_default">デフォルト</string>
+    <string name="font_serif">セリフ</string>
+    <string name="font_monospace">等幅</string>
+    <string name="font_light">細字</string>
+    <string name="font_bold">太字</string>
+    <string name="label_size">サイズ</string>
+    <string name="label_clock_offset_x">時計 横位置</string>
+    <string name="label_clock_offset_y">時計 縦位置</string>
+    <string name="label_date">日付</string>
+    <string name="label_date_position">日付位置</string>
+    <string name="date_pos_left">左</string>
+    <string name="date_pos_right">右</string>
+    <string name="date_pos_top">上</string>
+    <string name="date_pos_bottom">下</string>
+    <string name="label_date_size">日付サイズ</string>
+    <string name="label_date_offset_x">日付 横位置</string>
+    <string name="label_date_offset_y">日付 縦位置</string>
+    <string name="label_burn_in">焼付防止</string>
+    <string name="label_rotation">回転</string>
+    <string name="label_number_scale">数字大きさ</string>
+    <string name="label_major_tick">5分ドット</string>
+    <string name="label_minor_tick">1分ドット</string>
+    <string name="label_hand_tip">針の先</string>
+    <string name="label_hand_thickness">針の太さ</string>
+    <string name="hand_tip_rounded">丸</string>
+    <string name="hand_tip_squared">角</string>
+    <string name="hand_tip_tapered">細</string>
+    <string name="label_language">言語</string>
+    <string name="language_ja">日本語</string>
+    <string name="language_en">English</string>
+    <string name="label_reset">リセット</string>
+    <string name="reset_action">初期状態に戻す</string>
 </resources>

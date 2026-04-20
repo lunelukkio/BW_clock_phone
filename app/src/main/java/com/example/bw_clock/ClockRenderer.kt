@@ -3,11 +3,13 @@ package com.example.bw_clock
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Typeface
 import java.util.Calendar
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 fun drawClock(
     canvas: Canvas,
@@ -79,43 +81,31 @@ fun drawClock(
         drawNumbers(canvas, centerX, centerY, radius, foregroundColor, settings.clockFont, settings.numberScale / 100f)
     }
 
-    val hourAngle = Math.toRadians(
-        ((hours % 12) + minutes / 60.0) * 30.0 - 90.0
-    ).toFloat()
-    val hourLength = radius * 0.55f
-    strokePaint.strokeWidth = 6f * density
-    strokePaint.strokeCap = Paint.Cap.ROUND
-    canvas.drawLine(
-        centerX, centerY,
-        centerX + cos(hourAngle) * hourLength,
-        centerY + sin(hourAngle) * hourLength,
-        strokePaint
-    )
-
-    val minuteAngle = Math.toRadians(
-        (minutes + seconds / 60.0) * 6.0 - 90.0
-    ).toFloat()
-    val minuteLength = radius * 0.78f
-    strokePaint.strokeWidth = 4f * density
-    canvas.drawLine(
-        centerX, centerY,
-        centerX + cos(minuteAngle) * minuteLength,
-        centerY + sin(minuteAngle) * minuteLength,
-        strokePaint
-    )
-
-    if (settings.showSecondHand) {
-        val secondAngle = Math.toRadians(seconds * 6.0 - 90.0).toFloat()
-        val secondLength = radius * 0.85f
-        strokePaint.color = secondHandColor
-        strokePaint.strokeWidth = 2f * density
-        canvas.drawLine(
-            centerX, centerY,
-            centerX + cos(secondAngle) * secondLength,
-            centerY + sin(secondAngle) * secondLength,
-            strokePaint
+    val thickness = settings.handThicknessScale / 100f
+    if (thickness > 0f) {
+        val hourAngle = Math.toRadians(
+            ((hours % 12) + minutes / 60.0) * 30.0 - 90.0
+        ).toFloat()
+        drawHand(
+            canvas, centerX, centerY, hourAngle, radius * 0.55f,
+            6f * density * thickness, foregroundColor, settings.handTipStyle, strokePaint, fillPaint
         )
-        strokePaint.color = foregroundColor
+
+        val minuteAngle = Math.toRadians(
+            (minutes + seconds / 60.0) * 6.0 - 90.0
+        ).toFloat()
+        drawHand(
+            canvas, centerX, centerY, minuteAngle, radius * 0.78f,
+            4f * density * thickness, foregroundColor, settings.handTipStyle, strokePaint, fillPaint
+        )
+
+        if (settings.showSecondHand) {
+            val secondAngle = Math.toRadians(seconds * 6.0 - 90.0).toFloat()
+            drawHand(
+                canvas, centerX, centerY, secondAngle, radius * 0.85f,
+                2f * density * thickness, secondHandColor, settings.handTipStyle, strokePaint, fillPaint
+            )
+        }
     }
 
     canvas.drawCircle(centerX, centerY, 5f * density, fillPaint)
@@ -138,6 +128,56 @@ fun drawClock(
         }
         canvas.drawRect(0f, 0f, width, height, overlay)
     }
+}
+
+private fun drawHand(
+    canvas: Canvas,
+    centerX: Float,
+    centerY: Float,
+    angle: Float,
+    length: Float,
+    strokeWidth: Float,
+    color: Int,
+    style: HandTipStyle,
+    strokePaint: Paint,
+    fillPaint: Paint
+) {
+    val endX = centerX + cos(angle) * length
+    val endY = centerY + sin(angle) * length
+    when (style) {
+        HandTipStyle.ROUNDED -> {
+            strokePaint.color = color
+            strokePaint.strokeWidth = strokeWidth
+            strokePaint.strokeCap = Paint.Cap.ROUND
+            canvas.drawLine(centerX, centerY, endX, endY, strokePaint)
+        }
+        HandTipStyle.SQUARED -> {
+            strokePaint.color = color
+            strokePaint.strokeWidth = strokeWidth
+            strokePaint.strokeCap = Paint.Cap.BUTT
+            canvas.drawLine(centerX, centerY, endX, endY, strokePaint)
+        }
+        HandTipStyle.TAPERED -> {
+            val dx = endX - centerX
+            val dy = endY - centerY
+            val len = sqrt(dx * dx + dy * dy).coerceAtLeast(0.0001f)
+            val normX = -dy / len
+            val normY = dx / len
+            val halfW = strokeWidth / 2f
+            val path = Path().apply {
+                moveTo(centerX + normX * halfW, centerY + normY * halfW)
+                lineTo(centerX - normX * halfW, centerY - normY * halfW)
+                lineTo(endX, endY)
+                close()
+            }
+            fillPaint.color = color
+            canvas.drawPath(path, fillPaint)
+            fillPaint.color = color
+        }
+    }
+    // Restore the stroke paint color to the foreground so the caller's later draws
+    // don't accidentally inherit the hand color.
+    strokePaint.color = color
 }
 
 private fun drawNumbers(
