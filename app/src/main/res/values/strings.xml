@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">BW_clock</string>
+    <string name="widget_description">BW アナログ時計</string>
 </resources>
