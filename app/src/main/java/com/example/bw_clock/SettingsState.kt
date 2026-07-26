@@ -29,11 +29,31 @@ enum class HandTipStyle {
     TAPERED;
 }
 
+/**
+ * Two parallel namespaces inside the single DataStore. Each key is stored
+ * twice (`app_*` and `widget_*`) so the foreground app and the home-screen
+ * widget can be configured independently, even though they share the same
+ * [ClockSettings] schema.
+ */
 enum class SettingsScope(val prefix: String) {
     APP("app_"),
     WIDGET("widget_")
 }
 
+/**
+ * Snapshot of every user-configurable clock parameter. The same shape is used
+ * for both the foreground app and the widget, but the widget renderer ignores
+ * a subset of fields at draw time — see [ClockWidget] for which ones and why.
+ *
+ * Field semantics worth knowing:
+ *  - `brightnessPercent` 0..100 maps to a black overlay (0 = full black, 100 = no overlay).
+ *  - `clockSizePercent` is clamped 50..200 (see [SettingsRepository.updateClockSizePercent]).
+ *  - `rotation` is normalized to 0/90/180/270 by [SettingsRepository.updateRotation].
+ *  - `numberScale` / `majorTickScale` / `minorTickScale` (0..500): 0 = hidden, no
+ *    separate boolean toggle.
+ *  - `handThicknessScale` (0..500): 0 skips drawing the hands entirely.
+ *  - All `*Offset*` fields are in *percent of the parent dimension*, not pixels.
+ */
 data class ClockSettings(
     val isDarkBackground: Boolean = true,
     val showSecondHand: Boolean = true,
@@ -117,6 +137,18 @@ private object LegacyKeys {
     val HAND_THICKNESS_SCALE = intPreferencesKey("hand_thickness_scale")
 }
 
+/**
+ * Reads and writes [ClockSettings] for both scopes.
+ *
+ * Read order per field: scoped key first (`app_*` or `widget_*`), then the
+ * unprefixed legacy key from pre-1.1 installs, then the data-class default.
+ * The legacy fallback intentionally seeds *both* scopes from the same source
+ * after upgrade, so an existing user's preferences carry forward into both
+ * the app and the widget until they edit one of them.
+ *
+ * Once the user edits a field (or [resetToDefaults] is called), the scoped
+ * key takes precedence and the legacy key becomes inert for that field.
+ */
 class SettingsRepository(private val context: Context) {
 
     val appSettingsFlow: Flow<ClockSettings> = flowFor(SettingsScope.APP)
@@ -236,6 +268,12 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit { it[ScopedKeys(scope).HAND_THICKNESS_SCALE] = value.coerceIn(0, 500) }
     }
 
+    /**
+     * Resets one scope to defaults by *writing explicit default values* to every
+     * scoped key — not by removing them. This matters: if we cleared the keys
+     * instead, the read path would fall back to [LegacyKeys] and re-surface
+     * pre-1.1 user values that the user just asked to discard.
+     */
     suspend fun resetToDefaults(scope: SettingsScope) {
         val keys = ScopedKeys(scope)
         val defaults = ClockSettings()

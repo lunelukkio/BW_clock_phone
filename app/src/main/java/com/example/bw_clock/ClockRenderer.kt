@@ -11,6 +11,40 @@ import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
 
+/**
+ * Pure drawing function shared by the foreground app ([ClockScreen]) and the
+ * home-screen widget ([ClockWidget]). Does not allocate beyond [Paint]/[Path]
+ * locals and reads no global state — all inputs come through parameters so the
+ * same renderer can target either a Compose [androidx.compose.foundation.Canvas]
+ * (via `nativeCanvas`) or an off-screen [Bitmap]-backed [Canvas].
+ *
+ * Coordinates: time is rendered around `(width/2, height/2)` plus
+ * [burnInOffsetX]/[burnInOffsetY] (anti burn-in shift) plus the user-configured
+ * `clockOffset*` from [settings]. `0°` points up (12 o'clock), angles grow
+ * clockwise (the `- 90°` term in each `Math.toRadians(...)` rotates the math
+ * convention into the clock convention).
+ *
+ * @param width Drawable width in pixels.
+ * @param height Drawable height in pixels.
+ * @param density Display density (`displayMetrics.density`) used to scale
+ *   stroke widths and dot radii so dp-relative sizes stay visually consistent
+ *   across devices.
+ * @param timeMillis Wall-clock time to render. Passed in (not read from
+ *   `System.currentTimeMillis()`) so the caller controls the tick cadence.
+ * @param backgroundColor If non-null the canvas is cleared to this color first.
+ *   Pass `null` when drawing onto a surface that already has a background
+ *   (Compose Box background, or an `ARGB_8888` bitmap that the widget composites
+ *   over the launcher).
+ * @param dimAlpha 0..1 black overlay applied last (post-everything). Used to
+ *   implement the `brightnessPercent` setting in the foreground app; the widget
+ *   passes 0 because Glance can't usefully dim a static bitmap.
+ * @param burnInOffsetX X pixel shift applied to the clock center to prevent
+ *   OLED burn-in when the app is used as an always-on display.
+ * @param burnInOffsetY Y pixel shift, same purpose as [burnInOffsetX].
+ * @param radiusPadding Fraction of the short side reserved as outer margin
+ *   before computing `radius`. 0.1 for the app (breathing room from the
+ *   screen edge), 0.0 for the widget so the clock fills its allocated cell.
+ */
 fun drawClock(
     canvas: Canvas,
     width: Float,
@@ -130,6 +164,20 @@ fun drawClock(
     }
 }
 
+/**
+ * Draws a single hand from the center to `(centerX + cos(angle)*length,
+ * centerY + sin(angle)*length)`.
+ *
+ * ROUNDED and SQUARED are cheap stroked lines (differ only in [Paint.Cap]).
+ * TAPERED is drawn as a filled triangle [Path] — base of width [strokeWidth]
+ * at the center, apex at the tip — which is why it cannot be expressed as a
+ * stroke cap and needs its own branch.
+ *
+ * Mutates the shared [strokePaint] and [fillPaint] in place (color / strokeWidth
+ * / strokeCap). The trailing `strokePaint.color = color` is a deliberate reset
+ * so a later caller in [drawClock] that reuses the same paint inherits a known
+ * color rather than whatever the previous hand left behind.
+ */
 private fun drawHand(
     canvas: Canvas,
     centerX: Float,
@@ -216,6 +264,18 @@ private fun drawNumbers(
     }
 }
 
+/**
+ * Draws the date (`M/D` on the first line, English day-of-week abbreviation
+ * on the second). The date is positioned in the margin *outside* the clock
+ * face: in portrait it goes above (LEFT) or below (RIGHT) the square clock
+ * area; in landscape it goes to the left or right of it. When the margin is
+ * narrower than the font size (landscape on a near-square cell) it falls back
+ * to a small inset from the edge instead of centering in the margin.
+ *
+ * Day-of-week strings are hard-coded English on purpose — they are part of the
+ * clock face design, not localized UI text, so they stay identical between the
+ * ja and en app locales.
+ */
 private fun drawDate(
     canvas: Canvas,
     calendar: Calendar,

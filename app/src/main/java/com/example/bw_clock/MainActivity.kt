@@ -30,6 +30,20 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
+/**
+ * Single activity host. Notes for readers/maintainers:
+ *
+ *  - Extends [AppCompatActivity] (not `ComponentActivity`) specifically so the
+ *    runtime language switch in [SettingsScreen] can call
+ *    `AppCompatDelegate.setApplicationLocales(...)` and have it actually
+ *    re-create the activity with the new locale. Don't downgrade the base class.
+ *  - The orientation is locked to portrait in the manifest. Rotation in the UI
+ *    is applied via a Compose `graphicsLayer { rotationZ = ... }` on the clock
+ *    Box, *not* by changing the activity orientation, so the settings panel and
+ *    system bars don't flip with the clock.
+ *  - Settings are opened by **double-tap** on the clock (single tap is reserved
+ *    so the user can dismiss accidentally-shown system bars by tapping anywhere).
+ */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var settingsRepository: SettingsRepository
@@ -40,6 +54,10 @@ class MainActivity : AppCompatActivity() {
         settingsRepository = SettingsRepository(applicationContext)
 
         // Reflect widget-scope setting changes to the home-screen widget immediately.
+        // Without this push, the widget would only pick up the new settings on the
+        // next minute tick from ClockWidgetReceiver — visibly laggy when the user is
+        // adjusting widget settings in the foreground app. `drop(1)` skips the initial
+        // emission so we don't redraw the widget once on every app launch.
         val widget = ClockWidget()
         lifecycleScope.launch {
             settingsRepository.widgetSettingsFlow

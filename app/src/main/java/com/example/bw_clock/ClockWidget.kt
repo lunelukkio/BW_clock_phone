@@ -20,8 +20,25 @@ import androidx.glance.layout.ContentScale
 import androidx.glance.layout.fillMaxSize
 import kotlinx.coroutines.flow.first
 
+/**
+ * Home-screen widget version of the clock. Reads the *widget-scope* settings
+ * (`widget_*` keys via [SettingsRepository.widgetSettingsFlow]) — independent
+ * from the foreground app's settings.
+ *
+ * Several settings are force-overridden in [WidgetContent] before rendering,
+ * because the widget environment cannot support them:
+ *  - `showSecondHand = false`: AppWidget cannot legally refresh more than once
+ *    per minute (see [ClockWidgetReceiver]), so a second hand would freeze.
+ *  - `burnInPrevention = false`: redundant — Glance recomposes the bitmap each
+ *    minute tick at a fixed center, and the launcher controls placement.
+ *  - `brightnessPercent = 100`: a dimming overlay on a static widget bitmap
+ *    just darkens the icon against the wallpaper; not useful.
+ *  - `rotation = 0`: the launcher owns widget orientation.
+ */
 class ClockWidget : GlanceAppWidget() {
 
+    // SizeMode.Exact -> provideGlance re-runs whenever the launcher resizes
+    // the widget, so the bitmap matches the new cell dimensions exactly.
     override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
@@ -41,7 +58,9 @@ class ClockWidget : GlanceAppWidget() {
 
         // Use a SQUARE bitmap sized to the shorter widget side, so the clock is never
         // clipped when the allocated area is non-square (or slightly non-square due to
-        // launcher padding).
+        // launcher padding). ContentScale.Fit on the Image then letterboxes the square
+        // into the actual cell. Capped at MAX_BITMAP_SIDE_PX to keep bitmap memory bounded
+        // on very large widgets (Glance bitmaps cross a Binder boundary).
         val shortSideDp = minOf(size.width.value, size.height.value)
         val sidePx = (shortSideDp * density).toInt()
             .coerceAtLeast(1)

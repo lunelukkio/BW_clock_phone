@@ -22,6 +22,23 @@ import kotlinx.coroutines.delay
 import kotlin.math.cos
 import kotlin.math.sin
 
+/**
+ * Foreground Compose host for the clock face. Owns two tickers:
+ *
+ *  1. **Time ticker** — drives [drawClock] by updating `currentTimeMillis`.
+ *     Cadence is 1 s when a second hand is shown, otherwise 60 s. The
+ *     [LaunchedEffect] is keyed on `settings.showSecondHand` so toggling
+ *     the second hand restarts the loop with the new cadence instead of
+ *     waiting out the previous `delay`.
+ *  2. **Burn-in offset ticker** — when `burnInPrevention` is on, shifts the
+ *     clock center along a slow circular orbit (one full lap every 360 min)
+ *     so a long-running always-on display doesn't burn a fixed clock face
+ *     into the OLED. When the setting is off the offsets are forced to 0.
+ *
+ * `dimAlpha = 1 - brightness%`: drawn as a final black overlay inside
+ * [drawClock]. This implements brightness as a darkening filter without
+ * touching the actual screen backlight.
+ */
 @Composable
 fun ClockScreen(settings: ClockSettings) {
     val clockColors = LocalClockColors.current
