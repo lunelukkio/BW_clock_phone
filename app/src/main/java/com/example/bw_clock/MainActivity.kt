@@ -48,6 +48,15 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var settingsRepository: SettingsRepository
 
+    override fun onResume() {
+        super.onResume()
+        // Re-arm the widget's minute alarm. A force-stop (user-initiated or by
+        // dev tooling) deletes the app's alarms, and a stopped app receives no
+        // broadcasts that could restore them — so opening the app is the
+        // recovery path. Redundant calls are harmless (same PendingIntent).
+        ClockWidgetReceiver.scheduleNextMinuteTick(this)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
