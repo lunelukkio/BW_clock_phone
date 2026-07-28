@@ -16,3 +16,4 @@ local.properties
 *.jks
 .idea/
 .claude/
+keystore.properties

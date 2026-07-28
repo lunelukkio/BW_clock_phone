@@ -1,7 +1,23 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+// Shared signing: sign debug (IDE Run) and release builds with the same
+// release key so an IDE deploy can update a previously installed signed APK
+// without the "different signature — uninstall required" roadblock.
+// Secrets live in keystore.properties (gitignored); while that file is absent
+// or still has REPLACE_ME placeholders, builds fall back to debug signing.
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+val useSharedSigning = keystoreProperties.getProperty("storePassword")
+    .let { it != null && it != "REPLACE_ME" }
 
 android {
     namespace = "com.example.bw_clock"
@@ -20,6 +36,17 @@ android {
 
     }
 
+    signingConfigs {
+        if (useSharedSigning) {
+            create("shared") {
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -27,6 +54,14 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (useSharedSigning) {
+                signingConfig = signingConfigs.getByName("shared")
+            }
+        }
+        debug {
+            if (useSharedSigning) {
+                signingConfig = signingConfigs.getByName("shared")
+            }
         }
     }
     compileOptions {

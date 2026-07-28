@@ -4,7 +4,7 @@
 
 ## Current Goal
 
-ホーム画面ウィジェットの時計表示が実時間からズレる問題の修正。**修正計画のうち項目1+2+4 を 2026-07-28 に実装（コミット 28152e6）し、Android 16 エミュレータで動作検証済み**。さらに検証中に見つかった「force-stop 後はアプリを開いてもアラームが復活しない」穴への対処（MainActivity.onResume での再アーム）を追加実装。残りは追加分の再ビルドと実機検証。項目3（SCREEN_ON 動的登録）はユーザー判断で見送り（実機検証後に必要なら追加）。
+ホーム画面ウィジェットの時計表示が実時間からズレる問題の修正。**2026-07-28 に実装（28152e6 + 0edf822）し、Android 16 エミュレータと実機 Pixel 6a（Android 17）の両方で動作検証済み**。残りは実機の長期放置でのズレ実測と端末再起動（BOOT_COMPLETED）確認のみ。項目3（SCREEN_ON 動的登録）は見送り（実機で不足が見えたら追加）。
 
 **実装環境**: ビルドと実機検証は Android Studio Panda 側で行う。CLI 側で `./gradlew` を走らせない（この CLI 環境には java が無い）。adb での実機/エミュレータ検証は CLI 側で可（SDK の `platform-tools/adb.exe` をフルパスで使用）。コードを編集する場合は着手前に `git status` / `git diff` で実際の状態を確認する。
 
@@ -29,6 +29,7 @@
 - `app/src/main/java/com/example/bw_clock/ClockWidgetReceiver.kt`: アラーム方式の全面書き換え + companion object 化（28152e6 + 追加分）
 - `app/src/main/java/com/example/bw_clock/MainActivity.kt`: onResume 再アーム追加（追加分）
 - `app/src/main/AndroidManifest.xml`: uses-permission 3件 + intent-filter 2 action 追加（28152e6）
+- `app/build.gradle.kts` + `.gitignore` + `keystore.properties`（gitignore 済・秘密はユーザー記入）: Run（debug）と release を同じ `release-key.jks` で署名する signingConfigs 配線。keystore.properties が無い/未記入の環境では debug 署名へフォールバック
 - `docs/handoff.md` / `docs/worklog.md`: 本更新
 
 ## Decisions Made
@@ -39,11 +40,10 @@
 
 ## Remaining Work
 
-1. Android Studio 側で再ビルド（onResume 再アーム追加分はビルド未検証）
-2. エミュレータまたは実機で force-stop 復旧を確認: `adb shell am force-stop com.example.bw_clock_phone` → アプリ起動 → 次の分境界でウィジェットが動き出すか
-3. 実機へインストールし、数時間放置後のズレ量を実測（修正前後比較）
-4. 端末再起動後にウィジェットが動き続けるか確認
-5. Doze 中の挙動確認: 画面消灯中は最大約15分間隔に間引かれるのは仕様。画面点灯直後に追いつくかを確認し、点灯瞬間の古い表示が気になるなら項目3を追加実装
+1. 実機で数時間〜数日放置後のズレ量を実測（従来は App Standby 降格で数分〜数十分遅れた。exact alarm はバケット非依存のはず。`adb shell am get-standby-bucket com.example.bw_clock_phone` と突き合わせる）
+2. 端末再起動後にウィジェットが動き続けるか確認（BOOT_COMPLETED は未検証の最後の復活経路）
+3. Doze 中の挙動確認: 画面消灯中は最大約15分間隔に間引かれるのは仕様。点灯直後に追いつくかを確認し、点灯瞬間の古い表示が気になるなら項目3を追加実装
+4. 実機のアプリ内設定はアンインストールで初期化済み。ユーザーが好みに再設定する
 
 ## Verification
 
@@ -54,15 +54,15 @@ Already run:
   - ウィジェット描画がステータスバー時刻と一致（スクリーンショットで目視確認）
   - 手動キック: `adb shell am broadcast -n com.example.bw_clock_phone/com.example.bw_clock.ClockWidgetReceiver -a com.example.bw_clock.action.MINUTE_TICK` で連鎖開始できることを確認
 - `app/build.gradle.kts` で compileSdk 36 / minSdk 21 を確認（API 分岐は `Build.VERSION.SDK_INT` で保護）
+- 実機 Pixel 6a（Android 17）で検証（12:01 に release-key 署名版を新規インストール）: `USE_EXACT_ALARM: granted=true`（インストール時自動付与）/ アラームは RTC_WAKEUP・window=0・分境界で登録 / 70分以上の連鎖自走 / ウィジェット表示がデバイス時刻と一致（スクリーンショット目視）/ force-stop → アプリ起動でアラーム復活（onResume 経路）
+- 全コード（onResume 追加分含む）は実機向けビルドで実コンパイル・実動作済み
 
 Still needed:
-- 追加分（onResume / companion 化）のビルド
-- 実機での放置・再起動・force-stop 検証（Remaining Work 2-5）
-- `adb shell am get-standby-bucket com.example.bw_clock_phone` でバケット確認（rare/restricted でもズレないことの実証）
+- 実機での長期放置・再起動検証（Remaining Work 1-3）
 
 ## Risks
 
-- **追加分はビルド未検証**: companion object 化と onResume 追加は次のビルドでコンパイル確認が必要（初回分はビルド・動作とも検証済み）
+- 署名配線は keystore.properties が無い環境（別 PC・clone 直後）では debug 署名へフォールバックする。その APK は実機の release-key 署名版と不一致になり上書きインストール不可（keystore.properties の再作成で解消）
 - API 31-32 でユーザーが SCHEDULE_EXACT_ALARM を取り消すと、システムが既存 exact alarm をキャンセルするため連鎖が切れる（アプリを開けば onResume 経由で inexact として復活）
 - Doze 中は exact でも約15分間隔に間引かれる（OS 仕様）。Doze exit で pending alarm が配信されるため点灯時にはほぼ即座に再同期される見込み（要実機確認）
 - 毎分 RTC_WAKEUP でバッテリー駆動時の消費が増える。常時給電の置き時計用途なら問題なし
