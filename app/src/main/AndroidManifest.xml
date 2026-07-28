@@ -2,6 +2,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Exact per-minute alarms for the widget clock. USE_EXACT_ALARM covers
+         API 33+ (install-time grant for clock apps, not user-revocable);
+         SCHEDULE_EXACT_ALARM covers API 31-32 only (granted by default but
+         revocable, hence the canScheduleExactAlarms() fallback in
+         ClockWidgetReceiver). Neither permission exists below API 31. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <!-- Alarms are lost on reboot; ClockWidgetReceiver re-arms on BOOT_COMPLETED. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -25,6 +37,8 @@
             android:label="@string/widget_description">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="android.intent.action.TIME_SET" />
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
                 <action android:name="com.example.bw_clock.action.MINUTE_TICK" />

@@ -4,77 +4,66 @@
 
 ## Current Goal
 
-ホーム画面ウィジェットの時計表示が実時間からズレる問題の修正。原因調査は完了し、修正計画のみ確定済み。**実装は未着手**（ユーザー指示: 計画だけ立てて記録する）。
+ホーム画面ウィジェットの時計表示が実時間からズレる問題の修正。**修正計画のうち項目1+2+4 を 2026-07-28 に Claude Code 側で実装済み（未ビルド・未コミット）**。残りはビルドと実機検証。項目3（SCREEN_ON 動的登録）はユーザー判断で見送り（実機検証後に必要なら追加）。
 
-**実装環境**: 2026-07-26 以降、ユーザーは Android Studio Panda 上で計画を進める。Claude Code / Codex はこのファイルの計画の参照元であり、実装とビルド検証は Android Studio 側で行われる前提。CLI 側で `./gradlew` を走らせて追いかけない。コードを編集する場合は Android Studio 側の編集と衝突しないよう、着手前に `git status` / `git diff` で実際の状態を確認する。
+**実装環境**: ビルドと実機検証は Android Studio Panda 側で行う。CLI 側で `./gradlew` を走らせない。コードを編集する場合は Android Studio 側の編集と衝突しないよう、着手前に `git status` / `git diff` で実際の状態を確認する。
 
 ## User Request
 
 「最近ウィジェットの時計が実時間とアナログ時計に誤差が出るようになった。何のバグか調べて。時計アプリ本体は大丈夫。おそらくウィジェットの描写の問題」
-→ 調査の結果、描画ではなく更新スケジューリングの問題と判明。続けて「計画だけしてhandoffに記録して」。
+→ 調査の結果、描画ではなく更新スケジューリングの問題と判明（4欠陥の調査詳細は git 971e5b8 時点の本ファイル参照）。2026-07-28 のセッションでユーザーが「項目1+2+4 を Claude Code 側で実装」を選択し、実装した。
 
-## Current State
+## Current State（実装後）
 
-- 描画コード (`ClockRenderer.kt` / `ClockWidget.kt`) にバグは無い。`drawClock()` は渡された `timeMillis` をそのまま角度に変換しており、`ClockWidget.kt:86` が描画直前に `System.currentTimeMillis()` を読む。**描いた瞬間は常に正しい → ズレは必ず「遅れ」方向のみで、進むことはない**。
-- 未コミット差分 (`git diff`) はウィジェット2ファイルとも KDoc コメント追加のみ。ロジックは v1.1 (489b521) 以降変わっていない。→ 「最近悪化した」のはコード変更ではなく OS 側挙動（App Standby バケット降格 / Doze）による。
-- 根本原因は `ClockWidgetReceiver.kt:77-83` の `alarmManager.setRepeating(AlarmManager.RTC, nextMinute, 60_000L, pending)`。
-
-### 特定した4つの欠陥
-
-1. **`AlarmManager.RTC`（非 WAKEUP）**: 端末スリープ中はアラームが発火しない。画面点灯時は前回発火時点の古いビットマップが見える。
-2. **`setRepeating` は API 19+ で inexact**: OS がバッチ処理し、Doze / App Standby でさらに遅延。アプリを開く頻度が下がるとバケットが `rare`/`restricted` へ降格し、遅延が数秒→数十分に伸びる。これが「最近になって目立ち出した」症状の説明。
-3. **再起動でアラームが消える**: `BOOT_COMPLETED` レシーバが無く、`res/xml/bw_clock_widget_info.xml` の `updatePeriodMillis="0"` なので、端末再起動後はウィジェットが完全に停止する（タップして `MainActivity` 経由で更新されるまで）。
-4. **画面 ON / アンロック時の再同期が無い**: 遅延が起きても、ユーザーが実際に見る瞬間に再描画する仕組みが無いためズレがそのまま見える。
+- `ClockWidgetReceiver.kt` を書き換え済み:
+  - `setRepeating(RTC)` を廃止。`scheduleNextMinuteTick()` が次の分境界へ one-shot の `setExactAndAllowWhileIdle(RTC_WAKEUP)` を登録し、`onReceive` が発火のたびに再登録する自己連鎖方式（項目1+4。毎回分境界へ再アラインするためドリフトは蓄積しない）
+  - API 分岐: API 23+ は `setExactAndAllowWhileIdle`、API 31+ で `canScheduleExactAlarms()` が false なら `setAndAllowWhileIdle` へ劣化（SecurityException 回避）、API 21-22 は `setExact`
+  - `BOOT_COMPLETED` / `MY_PACKAGE_REPLACED` を onReceive で処理し連鎖を復活（項目2）
+  - `hasActiveWidgets()`（`AppWidgetManager.getAppWidgetIds`）ガード: ウィジェット未配置なら cancel して連鎖を止める（毎分の無駄な wakeup 防止）
+  - onReceive は「再アーム（同期）→ redraw（非同期）」の順。redraw 完了前にプロセスが殺されても連鎖は生存する
+- `AndroidManifest.xml`:
+  - `USE_EXACT_ALARM`（API 33+、インストール時付与・取り消し不可）、`SCHEDULE_EXACT_ALARM` maxSdkVersion=32（API 31-32、デフォルト付与だがユーザー取り消し可）、`RECEIVE_BOOT_COMPLETED` を追加
+  - receiver の intent-filter に `BOOT_COMPLETED` / `MY_PACKAGE_REPLACED` を追加（両者とも implicit broadcast 制限の例外リスト掲載で manifest 受信可）
 
 ## Files Touched
 
-- `AGENTS.md`: 新規作成（handoff スキルのテンプレート）
-- `docs/handoff.md`: 新規作成（本ファイル）
-- ウィジェット関連のソースは**未変更**。既存の未コミット差分はコメント追加のみで、今回のセッションで触っていない。
+- `app/src/main/java/com/example/bw_clock/ClockWidgetReceiver.kt`: アラーム方式の全面書き換え（KDoc も新方式へ更新）
+- `app/src/main/AndroidManifest.xml`: uses-permission 3件 + intent-filter 2 action 追加
+- `docs/handoff.md` / `docs/worklog.md`: 本更新
 
 ## Decisions Made
 
-- 「描画バグ」という当初の仮説は棄却。原因は更新タイミング（AlarmManager）側と結論。
-- 修正は 4 項目セット（下記 Remaining Work）を推奨案として提示。ユーザーはまだ実装範囲を選択していない。
-- 毎分 `RTC_WAKEUP` はバッテリー消費が増えるトレードオフをユーザーへ明示済み。常時給電の置き時計用途なら許容という前提。
-- 単独で入れるなら効果が最も大きいのは項目 3（画面 ON 時の即時再同期）と判断。
+- 実装範囲は項目1+2+4（ユーザーが AskUserQuestion で選択）。項目3（SCREEN_ON / USER_PRESENT 動的登録）は見送り: プロセス非常駐時に効かない可能性があり、かつ Doze exit（画面点灯）時に pending の exact alarm が配信されるため項目1で大部分カバーされる見込み。実機検証で不足が見えたら追加する
+- ウィジェット未配置時はアラーム連鎖を自然消滅させる（`hasActiveWidgets` ガード）
+- `goAsync()` は導入せず既存の `coroutineScope.launch` パターンを維持。再アームを onReceive 内で同期実行するため、連鎖の生存が redraw の完了に依存しない
 
 ## Remaining Work
 
-実装範囲についてユーザーの選択待ち（全部 or 項目3だけの軽い対処）。決まったら以下を実装する。
-
-1. **正確なアラームへ移行**: `setRepeating` を廃し、毎分 `setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, …)` を発火のたびに自己再スケジュールする方式へ変更。時計アプリなので Android 13+ は `USE_EXACT_ALARM`（インストール時付与・ユーザー確認不要）を manifest 宣言、Android 12 は `SCHEDULE_EXACT_ALARM` + `AlarmManager.canScheduleExactAlarms()` チェックと inexact フォールバックを用意する。
-2. **`BOOT_COMPLETED`（+ `ACTION_MY_PACKAGE_REPLACED`）受信**を追加し、再起動・アプリ更新後にアラームを再スケジュール。`RECEIVE_BOOT_COMPLETED` パーミッションが必要。
-3. **`ACTION_SCREEN_ON` / `ACTION_USER_PRESENT` を `Context.registerReceiver` で動的登録**して即時再同期＋アラーム再アライン。マニフェスト宣言では受け取れない点に注意（Application か常駐 Service 側で登録先を決める必要があり、ウィジェットのみのアプリでは登録ライフサイクルの設計が要検討）。
-4. **発火のたびに次の分境界へ再アライン**し、ドリフト累積を防ぐ（`now - now % 60_000 + 60_000`）。
-
-### 未確認事項
-
-- 実機の Android バージョンと、当該アプリの App Standby バケット（`adb shell am get-standby-bucket com.example.bw_clock_phone` で確認可能）。
-- ズレが実際に「遅れ方向のみ」か（コード上の予測と一致するかの検証）。
-- 電池最適化の除外設定が入っているか。
+1. Android Studio 側でビルドしてコンパイル確認（CLI 側ではビルドしていない）
+2. 実機へインストールし、数時間放置後のズレ量を実測（修正前後比較）
+3. 端末再起動後にウィジェットが動き続けるか確認
+4. Doze 中の挙動確認: 画面消灯中は最大約15分間隔に間引かれるのは仕様。画面点灯直後に追いつくかを確認し、点灯瞬間の古い表示が気になるなら項目3を追加実装
 
 ## Verification
 
-Already run:
-- `git diff -- ClockWidget.kt ClockWidgetReceiver.kt`: コメント追加のみでロジック変更なしと確認
-- `git log --oneline -- ClockWidget.kt ClockWidgetReceiver.kt`: v1.1 (489b521) 以降コミットなしと確認
-- `res/xml/bw_clock_widget_info.xml` と `AndroidManifest.xml` を読み、`updatePeriodMillis="0"` と BOOT_COMPLETED レシーバ不在を確認
+Already run（静的確認のみ・ビルド未実施）:
+- 変更前に `git status --porcelain` で clean を確認（Android Studio 側との編集衝突なし）
+- `app/build.gradle.kts` で compileSdk 36 / minSdk 21 を確認（`canScheduleExactAlarms` API 31 / `setExactAndAllowWhileIdle` API 23 はコンパイル可能、実行時は `Build.VERSION.SDK_INT` 分岐で保護）
 
 Still needed:
-- `./gradlew assembleRelease`: 修正実装後のビルド確認
-- `adb shell dumpsys alarm | grep bw_clock`: アラームが実際に登録・発火しているかの実機確認
-- 実機で数時間放置後のズレ量の実測（修正前後の比較）
+- ビルド（Remaining Work 1）
+- `adb shell dumpsys alarm | grep bw_clock` でアラーム登録・発火の実機確認
+- `adb shell am get-standby-bucket com.example.bw_clock_phone` でバケット確認
 
 ## Risks
 
-- Android 12 (API 31) で `SCHEDULE_EXACT_ALARM` が拒否された場合の劣化パスを必ず用意すること。未対応だと `SecurityException` でクラッシュする。
-- 毎分 `RTC_WAKEUP` はバッテリー駆動時の消費が増える。設定でウィジェット更新精度を切り替えられるようにする案も検討余地あり。
-- `minSdk 21` なので `setExactAndAllowWhileIdle` (API 23+) と `canScheduleExactAlarms` (API 31+) は必ず `Build.VERSION.SDK_INT` で分岐する。
-- `ACTION_SCREEN_ON` の動的登録は、登録主体（プロセス）が生きていないと受け取れない。ウィジェットのみのアプリではプロセスが常駐しないため、この対策単独では期待通り効かない可能性がある。実装前にこの点の検証が必要。
-- `ClockWidget` は `showSecondHand=false` を強制しているため、秒針ズレの議論は対象外。分針は `minutes + seconds/60` で描くので、発火が数秒遅れても視覚的には無視できる。
+- **ビルド未検証**: CLI 側でコンパイルしていないため、typo や API 誤用が残っている可能性がある。最初のビルドで必ず確認する
+- API 31-32 でユーザーが SCHEDULE_EXACT_ALARM を取り消すと、システムが既存 exact alarm をキャンセルするため連鎖が切れる（inexact フォールバックは次にスケジュールする分から効く）。復活はウィジェット再配置・タップ・再起動などの契機待ち。edge case として許容した
+- Doze 中は exact でも約15分間隔に間引かれる（OS 仕様）。画面消灯中のズレは残るが、Doze exit で pending alarm が配信されるため点灯時にはほぼ即座に再同期される見込み（要実機確認）
+- 毎分 RTC_WAKEUP でバッテリー駆動時の消費が増える。常時給電の置き時計用途なら問題なし
+- `ClockWidget` は `showSecondHand=false` を強制しているため秒針ズレは対象外。分針は `minutes + seconds/60` で描くので、数秒の発火遅延は視覚的に無視できる
 
 ## Suggested Skills
 
-- `/worklog`: 実装完了後の作業ログ記録
-- `/code-review` または `code-reviewer` エージェント: AlarmManager 周りの API レベル分岐は実装後にレビューを推奨
+- `/code-review` または `code-reviewer` エージェント: AlarmManager 周りの API レベル分岐のレビュー推奨
+- `/worklog`: 実機検証完了後の記録

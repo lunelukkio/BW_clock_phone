@@ -3,8 +3,10 @@ package com.example.bw_clock
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
@@ -21,15 +23,25 @@ import kotlinx.coroutines.launch
  * since Android 8.0 (Oreo), implicit broadcasts such as `ACTION_TIME_TICK`
  * are no longer delivered to manifest-registered receivers, so the widget
  * would only refresh when the user interacted with it. Instead this class
- * uses [AlarmManager.setRepeating] with a custom [ACTION_MINUTE_TICK]
- * action targeted explicitly at this receiver — which is delivered.
+ * arms an exact one-shot alarm with a custom [ACTION_MINUTE_TICK] action
+ * targeted explicitly at this receiver and re-arms it on every fire —
+ * a self-chaining alarm, re-aligned to the next minute boundary each time
+ * so drift cannot accumulate.
  *
- * Trade-off: `setRepeating` is inexact on API 19+, so the widget may lag
- * the wall clock by a few seconds. That is acceptable for a minute-resolution
- * display (and the only way to get a wakeup is exact alarms, which now require
- * a runtime permission). [Intent.ACTION_TIME_CHANGED] / [Intent.ACTION_TIMEZONE_CHANGED]
- * are still implicit but allowed without manifest declaration for time-zone
- * sync, so we additionally refresh on those.
+ * Exactness: `setExactAndAllowWhileIdle(RTC_WAKEUP)` keeps the widget on the
+ * wall-clock minute even under Doze / App Standby, where the previous
+ * `setRepeating(RTC)` implementation (inexact, non-waking) lagged by minutes
+ * to tens of minutes. In deep Doze the OS still throttles whileIdle alarms
+ * to roughly one per 15 minutes, but pending alarms are delivered on Doze
+ * exit — i.e. when the screen turns on — so the visible clock re-syncs
+ * almost immediately. The per-minute wakeup battery cost is accepted:
+ * the app targets always-on desk-clock use.
+ *
+ * Recovery: alarms do not survive a reboot, and the widget's
+ * `updatePeriodMillis` is 0, so this receiver also handles
+ * `ACTION_BOOT_COMPLETED` / `ACTION_MY_PACKAGE_REPLACED` (both exempt from
+ * the implicit-broadcast restriction) to restart the chain; previously the
+ * widget froze permanently after every reboot until tapped.
  */
 class ClockWidgetReceiver : GlanceAppWidgetReceiver() {
 
@@ -42,7 +54,16 @@ class ClockWidgetReceiver : GlanceAppWidgetReceiver() {
         when (intent.action) {
             ACTION_MINUTE_TICK,
             Intent.ACTION_TIME_CHANGED,
-            Intent.ACTION_TIMEZONE_CHANGED -> updateAll(context)
+            Intent.ACTION_TIMEZONE_CHANGED,
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_MY_PACKAGE_REPLACED -> {
+                // Re-arm before redrawing: the redraw is async and the process
+                // may be killed before it completes, but the chain must survive.
+                // (Time / timezone changes also move the minute boundary, so
+                // the pending alarm needs re-aligning, not just the display.)
+                scheduleNextMinuteTick(context)
+                updateAll(context)
+            }
         }
     }
 
@@ -52,12 +73,12 @@ class ClockWidgetReceiver : GlanceAppWidgetReceiver() {
         appWidgetIds: IntArray
     ) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        scheduleMinuteTicks(context)
+        scheduleNextMinuteTick(context)
     }
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        scheduleMinuteTicks(context)
+        scheduleNextMinuteTick(context)
     }
 
     override fun onDisabled(context: Context) {
@@ -71,20 +92,56 @@ class ClockWidgetReceiver : GlanceAppWidgetReceiver() {
         ids.forEach { id -> glanceAppWidget.update(context, id) }
     }
 
-    // Aligns the first alarm to the next wall-clock minute boundary (so the
-    // widget flips at :00 seconds, not at whatever offset the receiver was
-    // first installed at), then repeats every 60 s.
-    private fun scheduleMinuteTicks(context: Context) {
+    // Arms a one-shot exact alarm at the next wall-clock minute boundary.
+    // onReceive calls this again on every fire, which keeps the chain alive.
+    // One-shot exact replaces setRepeating(RTC), which is inexact on API 19+
+    // and was delayed unboundedly by Doze / App Standby bucket demotion
+    // (the observed widget-clock lag).
+    private fun scheduleNextMinuteTick(context: Context) {
+        if (!hasActiveWidgets(context)) {
+            // No widget placed (last one removed, or boot without any): stop
+            // the chain instead of waking the device every minute for nothing.
+            cancelMinuteTicks(context)
+            return
+        }
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val pending = minuteTickPendingIntent(context)
         val now = System.currentTimeMillis()
         val nextMinute = now - (now % 60_000L) + 60_000L
-        alarmManager.setRepeating(AlarmManager.RTC, nextMinute, 60_000L, pending)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                alarmManager.canScheduleExactAlarms()
+            ) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP, nextMinute, pending
+                )
+            } else {
+                // API 31-32 with SCHEDULE_EXACT_ALARM revoked by the user
+                // (API 33+ holds the non-revocable USE_EXACT_ALARM instead):
+                // degrade to inexact rather than crash with SecurityException.
+                alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP, nextMinute, pending
+                )
+            }
+        } else {
+            // API 21-22: Doze does not exist yet; plain setExact needs no
+            // permission and fires reliably.
+            alarmManager.setExact(AlarmManager.RTC_WAKEUP, nextMinute, pending)
+        }
     }
 
     private fun cancelMinuteTicks(context: Context) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         alarmManager.cancel(minuteTickPendingIntent(context))
+    }
+
+    // AppWidgetManager rather than GlanceAppWidgetManager because this must
+    // be answerable synchronously inside onReceive; the provider's
+    // ComponentName is this receiver class.
+    private fun hasActiveWidgets(context: Context): Boolean {
+        val ids = AppWidgetManager.getInstance(context)
+            .getAppWidgetIds(ComponentName(context, ClockWidgetReceiver::class.java))
+        return ids.isNotEmpty()
     }
 
     private fun minuteTickPendingIntent(context: Context): PendingIntent {
