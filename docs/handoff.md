@@ -4,7 +4,7 @@
 
 ## Current Goal
 
-ホーム画面ウィジェットの時計表示が実時間からズレる問題の修正。**2026-07-28 に実装（28152e6 + 0edf822）し、Android 16 エミュレータと実機 Pixel 6a（Android 17）の両方で動作検証済み**。残りは実機の長期放置でのズレ実測と端末再起動（BOOT_COMPLETED）確認のみ。項目3（SCREEN_ON 動的登録）は見送り（実機で不足が見えたら追加）。
+ホーム画面ウィジェットの時計表示が実時間からズレる問題の修正。**2026-07-28 に実装（28152e6 + 0edf822）し、Android 16 エミュレータと実機 Pixel 6a（Android 17）の両方で動作検証済み。本番 release ビルド（release-key 署名）も同日実機へ配備済み**。残りは実機の長期放置でのズレ実測と端末再起動（BOOT_COMPLETED）確認のみ。項目3（SCREEN_ON 動的登録）は見送り（実機で不足が見えたら追加）。
 
 **実装環境**: ビルドと実機検証は Android Studio Panda 側で行う。CLI 側で `./gradlew` を走らせない（この CLI 環境には java が無い）。adb での実機/エミュレータ検証は CLI 側で可（SDK の `platform-tools/adb.exe` をフルパスで使用）。コードを編集する場合は着手前に `git status` / `git diff` で実際の状態を確認する。
 

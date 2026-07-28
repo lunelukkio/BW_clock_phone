@@ -17,3 +17,4 @@
 - ズレ修正を実装しコミット（28152e6 + 0edf822）: 分境界への one-shot `setExactAndAllowWhileIdle(RTC_WAKEUP)` 自己連鎖方式 + BOOT_COMPLETED / MY_PACKAGE_REPLACED / MainActivity.onResume の3復活経路
 - エミュレータ（Android 16）と実機 Pixel 6a（Android 17）で検証完了: `USE_EXACT_ALARM` 自動付与、分境界 exact alarm の長時間自走、ウィジェット表示の時刻一致、force-stop → アプリ起動で復活
 - 実機の旧 APK（release-key 署名）と Run の debug 署名の不一致で一度アンインストールが発生（設定消失）。再発防止に keystore.properties + signingConfigs で debug/release 共通署名を配線
+- Generate Signed APK ウィザードで本番 release APK を生成し実機へ配備（署名は4月と同一の release-key）。`app/release/` の配布 APK も更新
