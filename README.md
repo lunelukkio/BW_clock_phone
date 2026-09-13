@@ -1,5 +1,12 @@
 # BW_clock_phone
 
+<p align="center">
+  <img src="docs/images/app-dark.png" alt="Phone app, dark theme" width="220">
+  <img src="docs/images/app-light.png" alt="Phone app, light theme" width="220">
+  <img src="docs/images/widget.jpg" alt="Home-screen widget" width="220">
+</p>
+<p align="center">Left to right: app (dark theme), app (light theme), home-screen widget<br>左から: 本体（黒背景）、本体（白背景）、ホーム画面ウィジェット</p>
+
 [English](#english) | [日本語](#日本語)
 
 ---
