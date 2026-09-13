@@ -5,7 +5,7 @@
   <img src="docs/images/app-light.png" alt="Phone app, light theme" width="220">
   <img src="docs/images/widget.jpg" alt="Home-screen widget" width="220">
 </p>
-<p align="center">Left to right: app (dark theme), app (light theme), home-screen widget<br>左から: 本体（黒背景）、本体（白背景）、ホーム画面ウィジェット</p>
+<p align="center">Left to right: app (dark theme), app (light theme), home-screen widget. In the widget image, the digital date, time and alarm in the middle are a separate widget from another app; BW_clock's widget is the analog clock face only.<br>左から: 本体（黒背景）、本体（白背景）、ホーム画面ウィジェット。ウィジェット画像の中央にある日付・時刻・アラームのデジタル表示は別アプリのウィジェットで、BW_clock のウィジェットはアナログ文字盤の部分だけです。</p>
 
 [English](#english) | [日本語](#日本語)
 
